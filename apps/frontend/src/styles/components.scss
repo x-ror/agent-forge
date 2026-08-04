@@ -76,6 +76,18 @@
   white-space: nowrap;
 }
 
+/* Titles link to the source issue; read as text until hovered. */
+.af-task-title__link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.af-task-title__link:hover,
+.af-task-title__link:focus {
+  color: var(--cds-link-primary);
+  text-decoration: underline;
+}
+
 .af-task-expanded td {
   padding: 0 !important;
   background: var(--cds-layer-01);
@@ -100,6 +112,10 @@
 
 .af-task-nested__title {
   width: 36%;
+  /* The nested table spans the full row, including under the parent's
+     expand-arrow column (2.5rem) — pad past it so children start visibly
+     to the right of the epic title (which sits at 2.5rem + 1rem). */
+  padding-left: 3.5rem !important;
 }
 
 .af-task-nested__indent {

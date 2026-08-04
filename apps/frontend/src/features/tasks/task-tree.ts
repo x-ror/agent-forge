@@ -10,6 +10,12 @@ export function parentExternalKey(task: TaskDto): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
+/** Source web page for the task (GitHub issue html_url); null for file/manual tasks. */
+export function taskUrl(task: TaskDto): string | null {
+  const v = task.meta?.url;
+  return typeof v === 'string' && /^https?:\/\//.test(v) ? v : null;
+}
+
 export interface TaskTreeNode {
   task: TaskDto;
   children: TaskDto[];

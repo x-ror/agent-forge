@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskDto } from '@agentforge/core';
-import { buildTaskTree, epicProgress, parentExternalKey, taskRole } from './task-tree';
+import { buildTaskTree, epicProgress, parentExternalKey, taskRole, taskUrl } from './task-tree';
 
 function task(partial: Partial<TaskDto> & Pick<TaskDto, 'id' | 'title'>): TaskDto {
   return {
@@ -82,6 +82,12 @@ describe('task meta helpers', () => {
     const t = task({ id: '1', title: 'x', meta: { role: 'epic', parentExternalKey: 'p' } });
     expect(taskRole(t)).toBe('epic');
     expect(parentExternalKey(t)).toBe('p');
+  });
+
+  it('exposes http(s) source urls only', () => {
+    expect(taskUrl(task({ id: '1', title: 'x', meta: { url: 'https://github.com/acme/widget/issues/4' } }))).toBe('https://github.com/acme/widget/issues/4');
+    expect(taskUrl(task({ id: '2', title: 'x', meta: { url: 'javascript:alert(1)' } }))).toBeNull();
+    expect(taskUrl(task({ id: '3', title: 'x', meta: { file: 'TASKS.md' } }))).toBeNull();
   });
 });
 

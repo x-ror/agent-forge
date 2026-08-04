@@ -31,7 +31,7 @@ import { useSse } from '../../api/sse';
 import { useAppState } from '../../state/app-state';
 import { StatusTag } from '../../components/StatusTag';
 import { formatDateTime } from '../../components/format';
-import { buildTaskTree, epicProgress, type TaskTreeNode } from './task-tree';
+import { buildTaskTree, epicProgress, taskUrl, type TaskTreeNode } from './task-tree';
 
 const HEADERS = [
   { key: 'title', header: 'Task' },
@@ -97,6 +97,17 @@ function NewTaskModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Title text, linked to the source page (GitHub issue) when one exists. */
+function TaskTitleText({ task }: { task: TaskDto }) {
+  const url = taskUrl(task);
+  if (!url) return <span className="af-task-title__text">{task.title}</span>;
+  return (
+    <a className="af-task-title__text af-task-title__link" href={url} target="_blank" rel="noreferrer">
+      {task.title}
+    </a>
+  );
+}
+
 function TaskTitleCell({ task, isEpic, childCount }: { task: TaskDto; isEpic?: boolean; childCount?: number }) {
   return (
     <span className={`af-task-title${isEpic ? ' af-task-title--epic' : ''}`}>
@@ -105,7 +116,7 @@ function TaskTitleCell({ task, isEpic, childCount }: { task: TaskDto; isEpic?: b
           epic
         </Tag>
       )}
-      <span className="af-task-title__text">{task.title}</span>
+      <TaskTitleText task={task} />
       {isEpic && childCount != null && childCount > 0 && (
         <span className="af-task-title__count">
           {childCount} task{childCount === 1 ? '' : 's'}
@@ -148,7 +159,7 @@ function NestedTasksTable({ tasks, onStart }: { tasks: TaskDto[]; onStart: (t: T
             <tr key={child.id} className="af-task-nested__row">
               <td className="af-task-nested__title">
                 <span className="af-task-nested__indent" aria-hidden />
-                {child.title}
+                <TaskTitleText task={child} />
               </td>
               <td>
                 <StatusTag status={child.status} />
