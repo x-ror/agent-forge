@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { parentNumberFromUrl, parseFileTasksMarkdown } from './providers';
 
 describe('parseFileTasksMarkdown', () => {
-  it('keeps legacy TASKS.md flat when the only heading is an h1 doc title', () => {
+  it('keeps a plain checklist flat regardless of doc headings', () => {
     const tasks = parseFileTasksMarkdown(['# Tasks', '', '- [ ] Add greeting feature', '- [x] Done already', '- [ ] Another task'].join('\n'), 'TASKS.md');
     expect(tasks.map((t) => t.title)).toEqual(['Add greeting feature', 'Another task']);
     expect(tasks.every((t) => t.meta.parentExternalKey === undefined)).toBe(true);
   });
 
-  it('nests checklist items under ## / ### section headings', () => {
+  it('groups items under Epic: headings only; plain headings end the group', () => {
     const md = `
 # Project board
 
@@ -22,29 +22,37 @@ describe('parseFileTasksMarkdown', () => {
 - [ ] Still under Billing
 `.trim();
     const tasks = parseFileTasksMarkdown(md, 'docs/TASKS.md');
-    // Auth epic + 2 children, Billing epic + 2 children
-    expect(tasks).toHaveLength(6);
+    // Auth epic + 2 children; Billing is a plain section → its items stay flat.
+    expect(tasks).toHaveLength(5);
 
     const auth = tasks.find((t) => t.title === 'Auth')!;
     expect(auth.meta.role).toBe('epic');
     expect(auth.externalKey).toBe('file:docs/TASKS.md:epic:auth');
 
     const login = tasks.find((t) => t.title === 'Login form')!;
+    const logout = tasks.find((t) => t.title === 'Logout button')!;
     expect(login.meta.parentExternalKey).toBe(auth.externalKey);
+    expect(logout.meta.parentExternalKey).toBe(auth.externalKey);
 
-    const billing = tasks.find((t) => t.title === 'Billing')!;
     const stripe = tasks.find((t) => t.title === 'Stripe checkout')!;
     const still = tasks.find((t) => t.title.startsWith('Still'))!;
-    expect(stripe.meta.parentExternalKey).toBe(billing.externalKey);
-    expect(still.meta.parentExternalKey).toBe(billing.externalKey);
+    expect(stripe.meta.parentExternalKey).toBeUndefined();
+    expect(still.meta.parentExternalKey).toBeUndefined();
+    expect(tasks.find((t) => t.title === 'Billing')).toBeUndefined();
   });
 
-  it('treats an explicit "# Epic: …" h1 as a section', () => {
+  it('accepts Epic: at any heading level, including h1', () => {
     const tasks = parseFileTasksMarkdown('# Epic: Onboarding\n- [ ] Welcome email\n', 'TASKS.md');
     expect(tasks).toHaveLength(2);
     expect(tasks[0]!.title).toBe('Onboarding');
     expect(tasks[0]!.meta.role).toBe('epic');
     expect(tasks[1]!.meta.parentExternalKey).toBe(tasks[0]!.externalKey);
+  });
+
+  it('does not emit an epic that has no unchecked items', () => {
+    const md = ['## Epic: Empty', '', '## Epic: Real', '- [ ] Only item'].join('\n');
+    const tasks = parseFileTasksMarkdown(md, 'TASKS.md');
+    expect(tasks.map((t) => t.title)).toEqual(['Real', 'Only item']);
   });
 
   it('leaves checklist-only files without epic parents', () => {

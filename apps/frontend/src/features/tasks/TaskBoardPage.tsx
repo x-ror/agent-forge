@@ -31,7 +31,7 @@ import { useSse } from '../../api/sse';
 import { useAppState } from '../../state/app-state';
 import { StatusTag } from '../../components/StatusTag';
 import { formatDateTime } from '../../components/format';
-import { buildTaskTree } from './task-tree';
+import { buildTaskTree, epicProgress, type TaskTreeNode } from './task-tree';
 
 const HEADERS = [
   { key: 'title', header: 'Task' },
@@ -113,6 +113,19 @@ function TaskTitleCell({ task, isEpic, childCount }: { task: TaskDto; isEpic?: b
       )}
     </span>
   );
+}
+
+/** Epic rows show completion instead of their own (meaningless) status. */
+function TaskStatusCell({ node }: { node: TaskTreeNode }) {
+  const progress = epicProgress(node);
+  if (progress) {
+    return (
+      <span className="af-task-progress">
+        {progress.done}/{progress.total} done
+      </span>
+    );
+  }
+  return <StatusTag status={node.task.status} />;
 }
 
 function TaskActions({ task, onStart }: { task: TaskDto; onStart: (t: TaskDto) => void }) {
@@ -262,7 +275,7 @@ export function TaskBoardPage() {
                             <TaskTitleCell task={task} isEpic childCount={node.children.length} />
                           </TableCell>
                           <TableCell>
-                            <StatusTag status={task.status} />
+                            <TaskStatusCell node={node} />
                           </TableCell>
                           <TableCell>{task.externalKey ?? 'manual'}</TableCell>
                           <TableCell className="af-cell--nowrap">{formatDateTime(task.updatedAt)}</TableCell>
@@ -286,7 +299,7 @@ export function TaskBoardPage() {
                         <TaskTitleCell task={task} isEpic={node.isEpic} />
                       </TableCell>
                       <TableCell>
-                        <StatusTag status={task.status} />
+                        <TaskStatusCell node={node} />
                       </TableCell>
                       <TableCell>{task.externalKey ?? 'manual'}</TableCell>
                       <TableCell className="af-cell--nowrap">{formatDateTime(task.updatedAt)}</TableCell>
@@ -301,7 +314,10 @@ export function TaskBoardPage() {
             {renderRows.length === 0 && (
               <Tile className="af-empty-state">
                 <h4>No tasks yet</h4>
-                <p>Sync a task source or add a manual task to fill the board. Use ## headings in TASKS.md (or GitHub sub-issues / epic labels) for nested epics.</p>
+                <p>
+                  Sync a task source or add a manual task to fill the board. Start a heading with <code>Epic:</code> in TASKS.md (or use GitHub sub-issues / epic labels) to group
+                  work under an epic.
+                </p>
               </Tile>
             )}
           </TableContainer>

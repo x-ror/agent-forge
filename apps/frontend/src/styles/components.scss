@@ -70,6 +70,12 @@
   margin: 0; /* Tag has its own spacing; flex gap handles layout */
 }
 
+.af-task-progress {
+  color: var(--cds-text-secondary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
 .af-task-expanded td {
   padding: 0 !important;
   background: var(--cds-layer-01);

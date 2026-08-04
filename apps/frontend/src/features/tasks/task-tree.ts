@@ -57,11 +57,29 @@ export function buildTaskTree(tasks: TaskDto[]): TaskTreeNode[] {
     roots.push({ task: t, children, isEpic });
   }
 
-  // Epics (with or without children) first, then standalone tasks — both newest-first.
-  roots.sort((a, b) => {
-    if (a.isEpic !== b.isEpic) return a.isEpic ? -1 : 1;
-    return sortByRecency(a.task, b.task);
-  });
+  // Newest-first, same as the board query — epics sit wherever recency puts
+  // them rather than jumping to the top.
+  roots.sort((a, b) => sortByRecency(a.task, b.task));
 
   return roots;
+}
+
+export interface EpicProgress {
+  done: number;
+  total: number;
+}
+
+/**
+ * Epic completion for the board row. Prefer GitHub's sub-issue summary when
+ * present — it counts closed sub-issues, which are never synced (only open
+ * issues are fetched) — else fall back to the synced children's statuses.
+ */
+export function epicProgress(node: TaskTreeNode): EpicProgress | null {
+  if (!node.isEpic) return null;
+  const sub = node.task.meta?.subIssues as { total?: unknown; completed?: unknown } | undefined;
+  if (typeof sub?.total === 'number' && sub.total > 0) {
+    return { done: typeof sub.completed === 'number' ? sub.completed : 0, total: sub.total };
+  }
+  if (node.children.length === 0) return null;
+  return { done: node.children.filter((c) => c.status === 'done').length, total: node.children.length };
 }

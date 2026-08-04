@@ -159,7 +159,10 @@ export function useTaskBoard(projectId: string | null, status?: string) {
   return useQuery({
     queryKey: ['tasks', projectId, status ?? 'all'],
     enabled: !!projectId,
-    queryFn: () => api.get<{ tasks: TaskDto[]; nextCursor: string | null }>(`/tasks?projectId=${projectId}${status ? `&status=${status}` : ''}`),
+    // Server max page (200, default is 50): epic grouping matches parents to
+    // children client-side, so a truncated page orphans children whose epic
+    // fell outside it.
+    queryFn: () => api.get<{ tasks: TaskDto[]; nextCursor: string | null }>(`/tasks?projectId=${projectId}&limit=200${status ? `&status=${status}` : ''}`),
   });
 }
 

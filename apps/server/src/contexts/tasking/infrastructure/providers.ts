@@ -24,52 +24,52 @@ export function parentNumberFromUrl(url: string | null | undefined): number | nu
 /**
  * Tracked-file markdown → external tasks.
  *
- * - Unchecked checklist items: `- [ ] Title`
- * - Section headings group following checklist items under an epic parent
- *   (`meta.role = 'epic'`, children get `meta.parentExternalKey`):
- *   - `##` / `###` always open an epic section
- *   - `#` only when the title starts with `Epic` (so a bare `# Tasks` doc
- *     title does not swallow the whole checklist)
- * - Heading titles may be `Epic: Foo` or plain `Foo`.
+ * - Unchecked checklist items (`- [ ] Title`) become tasks.
+ * - One grouping rule: a heading whose title starts with `Epic:` (any `#`
+ *   level) collects the checklist items below it under an epic parent
+ *   (`meta.role = 'epic'`, children get `meta.parentExternalKey`). Every
+ *   other heading simply ends the current group — plain sections like
+ *   `## Notes` never become epics by accident.
+ * - An epic with no unchecked items is not emitted (no dangling epic rows).
  */
 export function parseFileTasksMarkdown(content: string, filePath: string): ExternalTask[] {
   const tasks: ExternalTask[] = [];
-  let currentEpicKey: string | null = null;
+  let epic: ExternalTask | null = null;
+  let epicEmitted = false;
 
   for (const raw of content.split('\n')) {
-    const line = raw.trimEnd();
-    const heading = /^(#{1,3})\s+(.+)$/.exec(line.trim());
+    const line = raw.trim();
+    const heading = /^#{1,3}\s+(.+)$/.exec(line);
     if (heading) {
-      const level = heading[1]!.length;
-      const rawTitle = heading[2]!.trim();
-      const explicitEpic = /^epic\b/i.test(rawTitle);
-      // h1 without "Epic" is a document title — leave the current section alone.
-      if (level === 1 && !explicitEpic) continue;
-
-      const title = rawTitle.replace(/^epic\s*[:\-–—]\s*/i, '').trim() || rawTitle;
-      const key = slugKey(title) || 'epic';
-      const externalKey = `file:${filePath}:epic:${key}`;
-      currentEpicKey = externalKey;
-      tasks.push({
-        externalKey,
-        title,
-        body: '',
-        meta: {
-          file: filePath,
-          role: 'epic',
-        } as { [key: string]: Json },
-      });
+      const epicTitle = /^epic\s*[:\-–—]\s*(.+)$/i.exec(heading[1]!.trim());
+      if (epicTitle) {
+        const title = epicTitle[1]!.trim();
+        epic = {
+          externalKey: `file:${filePath}:epic:${slugKey(title) || 'epic'}`,
+          title,
+          body: '',
+          meta: { file: filePath, role: 'epic' } as { [key: string]: Json },
+        };
+        epicEmitted = false;
+      } else {
+        epic = null;
+      }
       continue;
     }
 
-    const match = /^\s*[-*]\s*\[ \]\s+(.+)$/.exec(line);
+    const match = /^[-*]\s*\[ \]\s+(.+)$/.exec(line);
     if (!match) continue;
     const title = match[1]!.trim();
-    const key = slugKey(title);
     const meta: { [key: string]: Json } = { file: filePath };
-    if (currentEpicKey) meta.parentExternalKey = currentEpicKey;
+    if (epic) {
+      if (!epicEmitted) {
+        tasks.push(epic);
+        epicEmitted = true;
+      }
+      meta.parentExternalKey = epic.externalKey;
+    }
     tasks.push({
-      externalKey: `file:${filePath}:${key}`,
+      externalKey: `file:${filePath}:${slugKey(title)}`,
       title,
       body: '',
       meta,
@@ -148,8 +148,8 @@ export class GithubIssuesProvider implements TaskSourceProvider {
 
 /**
  * Tracked-file source: a markdown checklist in the repo. Config: { path }.
- * Lines like `- [ ] Title` become tasks (unchecked only). Headings group
- * subsequent items under an epic parent (see parseFileTasksMarkdown).
+ * Lines like `- [ ] Title` become tasks (unchecked only). `Epic:` headings
+ * group subsequent items under an epic parent (see parseFileTasksMarkdown).
  */
 @Injectable()
 export class FileTasksProvider implements TaskSourceProvider {

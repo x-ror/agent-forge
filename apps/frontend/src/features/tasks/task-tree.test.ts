@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskDto } from '@agentforge/core';
-import { buildTaskTree, parentExternalKey, taskRole } from './task-tree';
+import { buildTaskTree, epicProgress, parentExternalKey, taskRole } from './task-tree';
 
 function task(partial: Partial<TaskDto> & Pick<TaskDto, 'id' | 'title'>): TaskDto {
   return {
@@ -44,10 +44,11 @@ describe('buildTaskTree', () => {
 
     const tree = buildTaskTree([child, orphan, epic]);
     expect(tree).toHaveLength(2);
-    expect(tree[0]!.task.id).toBe('e');
-    expect(tree[0]!.isEpic).toBe(true);
-    expect(tree[0]!.children.map((c) => c.id)).toEqual(['c']);
-    expect(tree[1]!.task.id).toBe('o');
+    // Roots stay newest-first — the standalone task is newer than the epic.
+    expect(tree[0]!.task.id).toBe('o');
+    expect(tree[1]!.task.id).toBe('e');
+    expect(tree[1]!.isEpic).toBe(true);
+    expect(tree[1]!.children.map((c) => c.id)).toEqual(['c']);
   });
 
   it('treats a parent with children as epic even without role flag', () => {
@@ -81,5 +82,30 @@ describe('task meta helpers', () => {
     const t = task({ id: '1', title: 'x', meta: { role: 'epic', parentExternalKey: 'p' } });
     expect(taskRole(t)).toBe('epic');
     expect(parentExternalKey(t)).toBe('p');
+  });
+});
+
+describe('epicProgress', () => {
+  it('prefers the GitHub sub-issue summary (closed sub-issues are not synced)', () => {
+    const epic = task({ id: 'e', title: 'Epic', externalKey: 'gh#1', meta: { role: 'epic', subIssues: { total: 5, completed: 3 } } });
+    const child = task({ id: 'c', title: 'Child', externalKey: 'gh#2', meta: { parentExternalKey: 'gh#1' } });
+    const tree = buildTaskTree([epic, child]);
+    expect(epicProgress(tree.find((n) => n.task.id === 'e')!)).toEqual({ done: 3, total: 5 });
+  });
+
+  it('falls back to synced children statuses', () => {
+    const epic = task({ id: 'e', title: 'Epic', externalKey: 'f:e', meta: { role: 'epic' } });
+    const done = task({ id: 'a', title: 'A', externalKey: 'f:a', status: 'done', meta: { parentExternalKey: 'f:e' } });
+    const open = task({ id: 'b', title: 'B', externalKey: 'f:b', meta: { parentExternalKey: 'f:e' } });
+    const tree = buildTaskTree([epic, done, open]);
+    expect(epicProgress(tree.find((n) => n.task.id === 'e')!)).toEqual({ done: 1, total: 2 });
+  });
+
+  it('returns null for non-epics and childless epics without a summary', () => {
+    const plain = task({ id: 'p', title: 'Plain' });
+    const emptyEpic = task({ id: 'e', title: 'Epic', meta: { role: 'epic' } });
+    const tree = buildTaskTree([plain, emptyEpic]);
+    expect(epicProgress(tree.find((n) => n.task.id === 'p')!)).toBeNull();
+    expect(epicProgress(tree.find((n) => n.task.id === 'e')!)).toBeNull();
   });
 });
