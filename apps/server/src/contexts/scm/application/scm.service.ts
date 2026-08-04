@@ -6,17 +6,8 @@ import { APP_ENV, type AppEnv } from '../../../config/env';
 import { uuidv7 } from '../../../shared/uuidv7';
 import type { Project } from '../../projects/domain/project';
 import { SecretProvisioningService } from '../../projects/application/projects.service';
-import {
-  ARTIFACT_REPOSITORY,
-  type ArtifactRepository,
-} from '../../execution/domain/repositories';
-import {
-  parseGithubRepo,
-  sanitizeBranchName,
-  ScmError,
-  type PullRequestResult,
-  type WorktreeInfo,
-} from '../domain/scm';
+import { ARTIFACT_REPOSITORY, type ArtifactRepository } from '../../execution/domain/repositories';
+import { parseGithubRepo, sanitizeBranchName, ScmError, type PullRequestResult, type WorktreeInfo } from '../domain/scm';
 import { GIT_PORT, GITHUB_PORT, type GitPort, type GithubPort } from '../domain/ports';
 
 /**
@@ -84,10 +75,7 @@ export class ScmService {
    * Worktree from the mirror on a fresh branch. Reuses an existing worktree
    * (recovery/resume) instead of failing.
    */
-  async createWorktree(
-    project: Project,
-    opts: { kind: 'run' | 'flow'; id: string; name: string; baseRef: string },
-  ): Promise<WorktreeInfo> {
+  async createWorktree(project: Project, opts: { kind: 'run' | 'flow'; id: string; name: string; baseRef: string }): Promise<WorktreeInfo> {
     const mirror = await this.ensureMirror(project);
     const wtPath = this.worktreePath(opts.kind, opts.id);
     const branch = `agentforge/${sanitizeBranchName(opts.name)}`;
@@ -95,10 +83,7 @@ export class ScmService {
       return { path: wtPath, branch, baseRef: opts.baseRef };
     }
     await mkdir(path.dirname(wtPath), { recursive: true });
-    const result = await this.git.run(
-      ['-C', mirror, 'worktree', 'add', '-b', branch, wtPath, opts.baseRef],
-      { allowFail: true },
-    );
+    const result = await this.git.run(['-C', mirror, 'worktree', 'add', '-b', branch, wtPath, opts.baseRef], { allowFail: true });
     if (result.exitCode !== 0) {
       if (/already exists/.test(result.stderr)) {
         // Branch left over from a previous attempt — reattach.
@@ -131,11 +116,7 @@ export class ScmService {
    * artifact (the api serves diffs from artifacts — it has no workspaces
    * volume).
    */
-  async finalizeRunWorkspace(run: {
-    id: string;
-    workspacePath: string | null;
-    baseRef: string;
-  }): Promise<{ committed: boolean; diffArtifactId: string | null }> {
+  async finalizeRunWorkspace(run: { id: string; workspacePath: string | null; baseRef: string }): Promise<{ committed: boolean; diffArtifactId: string | null }> {
     const worktree = run.workspacePath;
     if (!worktree || !existsSync(path.join(worktree, '.git'))) {
       return { committed: false, diffArtifactId: null };
@@ -162,15 +143,7 @@ export class ScmService {
    * token, falls back to a patch artifact — never fails the flow for missing
    * infrastructure.
    */
-  async pushAndOpenPr(args: {
-    project: Project;
-    runId: string;
-    worktree: string;
-    branch: string;
-    baseRef: string;
-    title: string;
-    body: string;
-  }): Promise<PullRequestResult> {
+  async pushAndOpenPr(args: { project: Project; runId: string; worktree: string; branch: string; baseRef: string; title: string; body: string }): Promise<PullRequestResult> {
     const env = await this.secrets.decryptedEnv(args.project.id);
     const token = env.GITHUB_TOKEN ?? env.GH_TOKEN;
     const githubRepo = parseGithubRepo(args.project.repoUrl);
@@ -189,10 +162,7 @@ export class ScmService {
     }
 
     if (githubRepo && token) {
-      const apiBase =
-        typeof args.project.settings.githubApiUrl === 'string'
-          ? args.project.settings.githubApiUrl
-          : undefined;
+      const apiBase = typeof args.project.settings.githubApiUrl === 'string' ? args.project.settings.githubApiUrl : undefined;
       const pr = await this.github.createPullRequest({
         apiBase,
         token,
@@ -229,21 +199,8 @@ export class ScmService {
     return { kind: 'pr', url: null, number: null, artifactId: null, branch: args.branch };
   }
 
-  private async patchArtifact(args: {
-    project: Project;
-    runId: string;
-    worktree: string;
-    branch: string;
-    baseRef: string;
-    title: string;
-  }): Promise<PullRequestResult> {
-    const { stdout } = await this.git.run([
-      '-C',
-      args.worktree,
-      'format-patch',
-      `${args.baseRef}..HEAD`,
-      '--stdout',
-    ]);
+  private async patchArtifact(args: { project: Project; runId: string; worktree: string; branch: string; baseRef: string; title: string }): Promise<PullRequestResult> {
+    const { stdout } = await this.git.run(['-C', args.worktree, 'format-patch', `${args.baseRef}..HEAD`, '--stdout']);
     const artifactId = uuidv7();
     await this.artifacts.insert({
       id: artifactId,

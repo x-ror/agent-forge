@@ -5,12 +5,7 @@ import { EventTypes } from '../../../shared/outbox/integration-event';
 import { uuidv7 } from '../../../shared/uuidv7';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../projects/domain/repositories';
 import { SecretProvisioningService } from '../../projects/application/projects.service';
-import {
-  TASK_REPOSITORY,
-  TASK_SOURCE_REPOSITORY,
-  type TaskRepository,
-  type TaskSourceRepository,
-} from '../domain/repositories';
+import { TASK_REPOSITORY, TASK_SOURCE_REPOSITORY, type TaskRepository, type TaskSourceRepository } from '../domain/repositories';
 import { TASK_SOURCE_PROVIDERS, type TaskSourceProvider } from '../domain/ports';
 
 /**

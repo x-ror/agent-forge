@@ -57,11 +57,7 @@ export class HttpClient {
     return this.cookie;
   }
 
-  async request(
-    method: string,
-    path: string,
-    body?: unknown,
-  ): Promise<{ status: number; body: unknown; headers: Headers }> {
+  async request(method: string, path: string, body?: unknown): Promise<{ status: number; body: unknown; headers: Headers }> {
     const headers: Record<string, string> = {};
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (this.cookie) headers.cookie = this.cookie;

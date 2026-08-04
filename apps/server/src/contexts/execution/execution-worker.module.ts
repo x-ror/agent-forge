@@ -20,8 +20,7 @@ import { SANDBOX_DRIVER } from './domain/sandbox';
     {
       provide: SANDBOX_DRIVER,
       inject: [APP_ENV, ProcessSandboxDriver, DockerSandboxDriver],
-      useFactory: (env: AppEnv, proc: ProcessSandboxDriver, docker: DockerSandboxDriver) =>
-        env.SANDBOX_DRIVER === 'docker' ? docker : proc,
+      useFactory: (env: AppEnv, proc: ProcessSandboxDriver, docker: DockerSandboxDriver) => (env.SANDBOX_DRIVER === 'docker' ? docker : proc),
     },
   ],
   exports: [RunOrchestrator],

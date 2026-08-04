@@ -77,9 +77,7 @@ export class OutboxDispatcher {
         await this.redis.publish(PUBSUB_CHANNEL, JSON.stringify(message));
       }
 
-      await em.query(`UPDATE outbox_events SET dispatched_at = now() WHERE id = ANY($1)`, [
-        rows.map((r) => r.id),
-      ]);
+      await em.query(`UPDATE outbox_events SET dispatched_at = now() WHERE id = ANY($1)`, [rows.map((r) => r.id)]);
       return rows.length;
     });
   }

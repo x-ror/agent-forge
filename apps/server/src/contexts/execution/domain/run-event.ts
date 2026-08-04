@@ -21,7 +21,8 @@ export interface RunInput {
 
 export interface Artifact {
   id: string;
-  runId: string;
+  runId: string | null;
+  flowRunId?: string | null;
   kind: 'diff' | 'pr' | 'file' | 'log-bundle' | 'patch';
   name: string;
   content: Buffer | null;

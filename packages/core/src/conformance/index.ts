@@ -2,16 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type {
-  AgentEvent,
-  AgentHandle,
-  AgentRunConfig,
-  RunContext,
-  SandboxExecOptions,
-  SandboxExecResult,
-  SandboxHandle,
-  SandboxProcess,
-} from '../index';
+import type { AgentEvent, AgentHandle, AgentRunConfig, RunContext, SandboxExecOptions, SandboxExecResult, SandboxHandle, SandboxProcess } from '../index';
 
 /**
  * Conformance test kit (§6.5): a real local sandbox + event collectors so
@@ -141,10 +132,7 @@ export interface CollectOptions {
 }
 
 /** Drains an adapter handle's event stream with a hard timeout. */
-export async function collectEvents(
-  handle: AgentHandle,
-  options: CollectOptions = {},
-): Promise<AgentEvent[]> {
+export async function collectEvents(handle: AgentHandle, options: CollectOptions = {}): Promise<AgentEvent[]> {
   const events: AgentEvent[] = [];
   const timeoutMs = options.timeoutMs ?? 30_000;
   let timer: NodeJS.Timeout | undefined;
@@ -157,9 +145,7 @@ export async function collectEvents(
     for (;;) {
       const next = await Promise.race([iterator.next(), timeout]);
       if (next === 'timeout') {
-        throw new Error(
-          `collectEvents timed out after ${timeoutMs}ms; got: ${events.map((e) => e.type).join(', ')}`,
-        );
+        throw new Error(`collectEvents timed out after ${timeoutMs}ms; got: ${events.map((e) => e.type).join(', ')}`);
       }
       if (next.done) break;
       events.push(next.value);
@@ -179,9 +165,7 @@ export function expectEventOrder(events: AgentEvent[], expected: string[]): void
   for (const want of expected) {
     const found = types.indexOf(want, index);
     if (found < 0) {
-      throw new Error(
-        `conformance: expected '${want}' after position ${index}; got sequence: ${types.join(' → ')}`,
-      );
+      throw new Error(`conformance: expected '${want}' after position ${index}; got sequence: ${types.join(' → ')}`);
     }
     index = found + 1;
   }

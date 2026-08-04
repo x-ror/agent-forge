@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { CreateRunRequest, Json, RunInputRequest } from '@agentforge/core';
 import { EventTypes } from '../../../shared/outbox/integration-event';
 import { uuidv7 } from '../../../shared/uuidv7';
@@ -12,12 +6,7 @@ import { AGENT_REPOSITORY, type AgentRepository } from '../../agent-registry/dom
 import { ProjectsService } from '../../projects/application/projects.service';
 import { Run } from '../domain/run';
 import type { RunEvent, RunInput } from '../domain/run-event';
-import {
-  RUN_EVENT_REPOSITORY,
-  RUN_REPOSITORY,
-  type RunEventRepository,
-  type RunRepository,
-} from '../domain/repositories';
+import { RUN_EVENT_REPOSITORY, RUN_REPOSITORY, type RunEventRepository, type RunRepository } from '../domain/repositories';
 import { RUN_TX, type RunTxPort } from '../domain/ports';
 
 @Injectable()
@@ -43,9 +32,7 @@ export class RunsService {
       baseRef: req.baseRef ?? project.defaultBranch,
     });
     // State + run.requested event commit atomically; the dispatcher enqueues.
-    await this.tx.insertRun(run, [
-      { aggregateType: 'run', aggregateId: run.id, eventType: EventTypes.RunRequested, payload: {} },
-    ]);
+    await this.tx.insertRun(run, [{ aggregateType: 'run', aggregateId: run.id, eventType: EventTypes.RunRequested, payload: {} }]);
     return run;
   }
 

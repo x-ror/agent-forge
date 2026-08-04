@@ -52,12 +52,7 @@ export class HealthController {
         report.worker = { heartbeatAgeMs: age, fresh: age < HEARTBEAT_FRESH_MS };
       }
       for (const name of QUEUE_NAMES) {
-        const counts = await this.queues[name].getJobCounts(
-          'waiting',
-          'active',
-          'delayed',
-          'failed',
-        );
+        const counts = await this.queues[name].getJobCounts('waiting', 'active', 'delayed', 'failed');
         report.queues[name] = {
           waiting: counts.waiting ?? 0,
           active: counts.active ?? 0,

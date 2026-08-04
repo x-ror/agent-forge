@@ -3,18 +3,8 @@ import { AgentRegistryModule } from '../agent-registry/agent-registry.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { PubSubListener } from '../../shared/sse/pubsub-listener.service';
 import { RunsService } from './application/runs.service';
-import {
-  ARTIFACT_REPOSITORY,
-  RUN_EVENT_REPOSITORY,
-  RUN_INPUT_REPOSITORY,
-  RUN_REPOSITORY,
-} from './domain/repositories';
-import {
-  TypeormArtifactRepository,
-  TypeormRunEventRepository,
-  TypeormRunInputRepository,
-  TypeormRunRepository,
-} from './infrastructure/typeorm-repositories';
+import { ARTIFACT_REPOSITORY, RUN_EVENT_REPOSITORY, RUN_INPUT_REPOSITORY, RUN_REPOSITORY } from './domain/repositories';
+import { TypeormArtifactRepository, TypeormRunEventRepository, TypeormRunInputRepository, TypeormRunRepository } from './infrastructure/typeorm-repositories';
 import { RunTxOps } from './infrastructure/run-tx-ops';
 import { RUN_TX } from './domain/ports';
 import { RunsController } from './interface/runs.controller';

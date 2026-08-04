@@ -22,11 +22,7 @@ describe('agentEventSchema', () => {
 
   it('rejects unknown event types and malformed payloads', () => {
     expect(agentEventSchema.safeParse({ type: 'nope', text: 'x' }).success).toBe(false);
-    expect(agentEventSchema.safeParse({ type: 'usage', tokensIn: -1, tokensOut: 0 }).success).toBe(
-      false,
-    );
-    expect(agentEventSchema.safeParse({ type: 'result', outcome: 'meh', summary: '' }).success).toBe(
-      false,
-    );
+    expect(agentEventSchema.safeParse({ type: 'usage', tokensIn: -1, tokensOut: 0 }).success).toBe(false);
+    expect(agentEventSchema.safeParse({ type: 'result', outcome: 'meh', summary: '' }).success).toBe(false);
   });
 });

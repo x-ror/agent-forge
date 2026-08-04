@@ -1,18 +1,6 @@
-import type {
-  AgentAdapter,
-  AgentEvent,
-  AgentHandle,
-  Json,
-  ResumeState,
-  RunContext,
-  StopReason,
-  UserMessage,
-} from '@agentforge/core';
+import type { AgentAdapter, AgentEvent, AgentHandle, Json, ResumeState, RunContext, StopReason, UserMessage } from '@agentforge/core';
 
-export type ScriptItem =
-  | AgentEvent
-  | { delayMs: number }
-  | { waitForever: true };
+export type ScriptItem = AgentEvent | { delayMs: number } | { waitForever: true };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -50,9 +38,7 @@ export class FakeHandle implements AgentHandle {
         return;
       }
       if (item.type === 'permission.request') {
-        const decision = new Promise<'allow' | 'deny'>((resolve) =>
-          this.permissionResolvers.set(item.id, resolve),
-        );
+        const decision = new Promise<'allow' | 'deny'>((resolve) => this.permissionResolvers.set(item.id, resolve));
         yield item;
         const result = await Promise.race([decision, this.stopPromise]);
         if (result === 'stopped') return;
@@ -103,10 +89,7 @@ export class FakeAdapter implements AgentAdapter {
     };
     if (opts.resume) {
       this.resume = async (_ctx: RunContext, state: ResumeState) => {
-        const startIndex =
-          typeof state.data === 'object' && state.data !== null && 'index' in state.data
-            ? Number((state.data as { index: Json }).index)
-            : 0;
+        const startIndex = typeof state.data === 'object' && state.data !== null && 'index' in state.data ? Number((state.data as { index: Json }).index) : 0;
         const handle = new FakeHandle(this.script, startIndex);
         this.handles.push(handle);
         return handle;

@@ -36,24 +36,7 @@ export class WorkerLifecycle implements OnModuleInit, OnApplicationShutdown {
 }
 
 @Module({
-  imports: [
-    EnvModule,
-    DatabaseModule,
-    RedisModule,
-    QueueModule,
-    OutboxModule,
-    ExecutionWorkerModule,
-    ScmModule,
-    ProjectsModule,
-    TaskingModule,
-    NotificationsModule,
-  ],
-  providers: [
-    OutboxDispatcher,
-    ReconciliationService,
-    WorkerHeartbeat,
-    WorkerLifecycle,
-    ProcessorsService,
-  ],
+  imports: [EnvModule, DatabaseModule, RedisModule, QueueModule, OutboxModule, ExecutionWorkerModule, ScmModule, ProjectsModule, TaskingModule, NotificationsModule],
+  providers: [OutboxDispatcher, ReconciliationService, WorkerHeartbeat, WorkerLifecycle, ProcessorsService],
 })
 export class WorkerModule {}

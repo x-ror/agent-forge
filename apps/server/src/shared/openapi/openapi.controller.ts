@@ -26,9 +26,7 @@ function jsonBody(zodSchema: ZodType): unknown {
 }
 
 function jsonResponse(description: string, zodSchema?: ZodType): unknown {
-  return zodSchema
-    ? { description, content: { 'application/json': { schema: schema(zodSchema) } } }
-    : { description };
+  return zodSchema ? { description, content: { 'application/json': { schema: schema(zodSchema) } } } : { description };
 }
 
 /** OpenAPI 3.1 generated from the shared Zod schemas (§9). Grows per phase. */

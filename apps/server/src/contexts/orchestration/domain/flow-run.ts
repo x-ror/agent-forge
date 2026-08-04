@@ -1,12 +1,6 @@
 import type { Json } from '@agentforge/core';
 
-export const FLOW_STATUSES = [
-  'running',
-  'awaiting_input',
-  'succeeded',
-  'failed',
-  'cancelled',
-] as const;
+export const FLOW_STATUSES = ['running', 'awaiting_input', 'succeeded', 'failed', 'cancelled'] as const;
 export type FlowStatus = (typeof FLOW_STATUSES)[number];
 
 export const ACTIVE_FLOW_STATUSES: readonly FlowStatus[] = ['running', 'awaiting_input'];

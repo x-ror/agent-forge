@@ -152,9 +152,7 @@ export class InitialSchema1754300000001 implements MigrationInterface {
         consumed_at timestamptz,
         created_at  timestamptz NOT NULL DEFAULT now()
       )`);
-    await queryRunner.query(
-      `CREATE INDEX run_inputs_pending ON run_inputs (run_id, created_at) WHERE consumed_at IS NULL`,
-    );
+    await queryRunner.query(`CREATE INDEX run_inputs_pending ON run_inputs (run_id, created_at) WHERE consumed_at IS NULL`);
 
     await queryRunner.query(`
       CREATE TABLE artifacts (
@@ -238,9 +236,7 @@ export class InitialSchema1754300000001 implements MigrationInterface {
         created_at     timestamptz NOT NULL DEFAULT now(),
         dispatched_at  timestamptz
       )`);
-    await queryRunner.query(
-      `CREATE INDEX outbox_pending ON outbox_events (id) WHERE dispatched_at IS NULL`,
-    );
+    await queryRunner.query(`CREATE INDEX outbox_pending ON outbox_events (id) WHERE dispatched_at IS NULL`);
 
     // ---- Append-only enforcement (invariant #6) ----------------------------
     // run_events: immutable, period.
@@ -302,30 +298,18 @@ export class InitialSchema1754300000001 implements MigrationInterface {
         END IF;
       END $$`);
     await queryRunner.query(`GRANT USAGE ON SCHEMA public TO agentforge_app`);
-    await queryRunner.query(
-      `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO agentforge_app`,
-    );
-    await queryRunner.query(
-      `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO agentforge_app`,
-    );
-    await queryRunner.query(
-      `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO agentforge_app`,
-    );
-    await queryRunner.query(
-      `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO agentforge_app`,
-    );
+    await queryRunner.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO agentforge_app`);
+    await queryRunner.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO agentforge_app`);
+    await queryRunner.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO agentforge_app`);
+    await queryRunner.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO agentforge_app`);
     // Append-only: the app role cannot UPDATE/DELETE audit tables at all —
     // except the single dispatched_at column the dispatcher must set.
     await queryRunner.query(`REVOKE UPDATE, DELETE ON run_events FROM agentforge_app`);
     await queryRunner.query(`REVOKE UPDATE, DELETE ON outbox_events FROM agentforge_app`);
     await queryRunner.query(`GRANT UPDATE (dispatched_at) ON outbox_events TO agentforge_app`);
-    await queryRunner.query(
-      `GRANT EXECUTE ON FUNCTION prune_dispatched_outbox(interval) TO agentforge_app`,
-    );
+    await queryRunner.query(`GRANT EXECUTE ON FUNCTION prune_dispatched_outbox(interval) TO agentforge_app`);
     // The migrations bookkeeping table stays admin-only.
-    await queryRunner.query(
-      `REVOKE ALL ON TABLE typeorm_migrations FROM agentforge_app`,
-    );
+    await queryRunner.query(`REVOKE ALL ON TABLE typeorm_migrations FROM agentforge_app`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

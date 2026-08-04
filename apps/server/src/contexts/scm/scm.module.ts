@@ -8,12 +8,7 @@ import { GithubClient } from './infrastructure/github-client';
 
 @Module({
   imports: [ProjectsModule],
-  providers: [
-    ScmService,
-    { provide: GIT_PORT, useClass: GitCli },
-    { provide: GITHUB_PORT, useClass: GithubClient },
-    ...executionRepositoryProviders,
-  ],
+  providers: [ScmService, { provide: GIT_PORT, useClass: GitCli }, { provide: GITHUB_PORT, useClass: GithubClient }, ...executionRepositoryProviders],
   exports: [ScmService, GIT_PORT, GITHUB_PORT],
 })
 export class ScmModule {}

@@ -10,13 +10,8 @@ import { ScmService } from '../../src/contexts/scm/application/scm.service';
 import { GitCli } from '../../src/contexts/scm/infrastructure/git-cli';
 import { GithubClient } from '../../src/contexts/scm/infrastructure/github-client';
 import { parseGithubRepo, sanitizeBranchName } from '../../src/contexts/scm/domain/scm';
-import {
-  SecretProvisioningService,
-} from '../../src/contexts/projects/application/projects.service';
-import {
-  TypeormProjectRepository,
-  TypeormSecretRepository,
-} from '../../src/contexts/projects/infrastructure/typeorm-repositories';
+import { SecretProvisioningService } from '../../src/contexts/projects/application/projects.service';
+import { TypeormProjectRepository, TypeormSecretRepository } from '../../src/contexts/projects/infrastructure/typeorm-repositories';
 import { TypeormArtifactRepository } from '../../src/contexts/execution/infrastructure/typeorm-repositories';
 import { TypeormUserRepository } from '../../src/contexts/identity/infrastructure/typeorm-repositories';
 import { SecretBox, type SecretBoxService } from '../../src/shared/crypto/secret-box';
@@ -49,13 +44,7 @@ describe('Phase 6: Scm — mirrors, worktrees, diff, push, PR', () => {
     };
     artifacts = new TypeormArtifactRepository(ds);
     const secretBox = new SecretBox(TEST_KEY) as SecretBoxService;
-    scm = new ScmService(
-      env,
-      artifacts,
-      new GitCli(),
-      new GithubClient(),
-      new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox),
-    );
+    scm = new ScmService(env, artifacts, new GitCli(), new GithubClient(), new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox));
 
     const users = new TypeormUserRepository(ds);
     const userId = uuidv7();
@@ -70,14 +59,8 @@ describe('Phase 6: Scm — mirrors, worktrees, diff, push, PR', () => {
       createdAt: new Date(),
     };
     await new TypeormProjectRepository(ds).insert(project);
-    const [agent] = await ds.query(
-      `INSERT INTO agents (owner_id, name, adapter) VALUES ($1,'A','api-loop') RETURNING id`,
-      [userId],
-    );
-    const [run] = await ds.query(
-      `INSERT INTO runs (project_id, agent_id, task_prompt, base_ref) VALUES ($1,$2,'x','main') RETURNING id`,
-      [project.id, agent.id],
-    );
+    const [agent] = await ds.query(`INSERT INTO agents (owner_id, name, adapter) VALUES ($1,'A','api-loop') RETURNING id`, [userId]);
+    const [run] = await ds.query(`INSERT INTO runs (project_id, agent_id, task_prompt, base_ref) VALUES ($1,$2,'x','main') RETURNING id`, [project.id, agent.id]);
     runId = run.id;
   }, 240_000);
 
@@ -135,9 +118,7 @@ describe('Phase 6: Scm — mirrors, worktrees, diff, push, PR', () => {
     expect(remoteFileAtBranch(repo, 'agentforge/task-42', 'src.txt')).toBe('modified by agent\n');
 
     const recorded = await artifacts.listByRun(runId);
-    expect(recorded.some((a) => a.kind === 'pr' && a.name.includes('agentforge/task-42'))).toBe(
-      true,
-    );
+    expect(recorded.some((a) => a.kind === 'pr' && a.name.includes('agentforge/task-42'))).toBe(true);
   });
 
   it('worktree creation is idempotent (recovery reattaches)', async () => {
@@ -164,13 +145,7 @@ describe('Phase 6: Scm — mirrors, worktrees, diff, push, PR', () => {
 
     await scm.syncMirror(project);
     const git = new GitCli();
-    const { stdout } = await git.run([
-      '-C',
-      scm.mirrorPath(project.id),
-      'log',
-      '--oneline',
-      'main',
-    ]);
+    const { stdout } = await git.run(['-C', scm.mirrorPath(project.id), 'log', '--oneline', 'main']);
     expect(stdout).toContain('up');
   });
 
@@ -221,13 +196,7 @@ describe('Phase 6: Scm — mirrors, worktrees, diff, push, PR', () => {
     // fall back? No: we want the PR path. Use a project whose push URL is
     // remapped by git's insteadOf config.
     const git = new GitCli();
-    await git.run([
-      '-C',
-      worktree.path,
-      'config',
-      `url.${repo.url}.insteadOf`,
-      'https://x-access-token:ghp_mock_token@github.com/acme/widget.git',
-    ]);
+    await git.run(['-C', worktree.path, 'config', `url.${repo.url}.insteadOf`, 'https://x-access-token:ghp_mock_token@github.com/acme/widget.git']);
 
     const result = await scm.pushAndOpenPr({
       project: ghProject,

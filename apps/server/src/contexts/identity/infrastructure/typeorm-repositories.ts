@@ -1,11 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { LessThan, type DataSource } from 'typeorm';
 import { DATA_SOURCE } from '../../../database/database.module';
-import type {
-  PersonalAccessTokenRepository,
-  SessionRepository,
-  UserRepository,
-} from '../domain/repositories';
+import type { PersonalAccessTokenRepository, SessionRepository, UserRepository } from '../domain/repositories';
 import type { PersonalAccessToken, Session, User } from '../domain/user';
 import { PersonalAccessTokenEntity, SessionEntity, UserEntity } from './entities';
 
@@ -69,9 +65,7 @@ export class TypeormPersonalAccessTokenRepository implements PersonalAccessToken
   }
 
   async listByUser(userId: string): Promise<PersonalAccessToken[]> {
-    return this.ds
-      .getRepository(PersonalAccessTokenEntity)
-      .find({ where: { userId }, order: { createdAt: 'DESC' } });
+    return this.ds.getRepository(PersonalAccessTokenEntity).find({ where: { userId }, order: { createdAt: 'DESC' } });
   }
 
   async revoke(id: string, at: Date): Promise<void> {

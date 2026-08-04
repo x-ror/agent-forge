@@ -1,28 +1,27 @@
 {
   "name": "agentforge",
-  "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@10.14.0",
-  "engines": {
-    "node": ">=22"
-  },
+  "private": true,
   "scripts": {
     "build": "pnpm -r build",
-    "lint": "eslint .",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "verify": "pnpm -r build && pnpm lint && pnpm -r typecheck && pnpm -r test",
+    "verify": "pnpm -r build && pnpm lint && pnpm format:check && pnpm -r typecheck && pnpm -r test",
     "dev:infra": "docker compose -f docker-compose.dev.yml up -d",
     "dev": "pnpm dev:infra && pnpm -r --parallel dev"
   },
   "devDependencies": {
-    "@eslint/js": "^9.20.0",
-    "eslint": "^9.20.0",
-    "eslint-config-prettier": "^10.0.0",
-    "prettier": "^3.4.0",
-    "typescript": "^5.7.0",
-    "typescript-eslint": "^8.24.0"
+    "oxfmt": "^0.62.0",
+    "oxlint": "^1.77.0",
+    "typescript": "^7.0.2"
   },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.14.0",
   "pnpm": {
     "onlyBuiltDependencies": [
       "@swc/core",

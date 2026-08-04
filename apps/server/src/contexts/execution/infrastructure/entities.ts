@@ -16,6 +16,7 @@ export class RunEntity {
   @Column('timestamptz', { nullable: true }) leaseAt: Date | null;
   @Column('text', { nullable: true }) workspacePath: string | null;
   @Column('jsonb', { nullable: true }) resumeState: unknown;
+  @Column('jsonb', { nullable: true }) structured: unknown;
   @Column('timestamptz') createdAt: Date;
   @Column('timestamptz', { nullable: true }) startedAt: Date | null;
   @Column('timestamptz', { nullable: true }) finishedAt: Date | null;
@@ -44,7 +45,8 @@ export class RunInputEntity {
 @Entity('artifacts')
 export class ArtifactEntity {
   @PrimaryColumn('uuid') id: string;
-  @Column('uuid') runId: string;
+  @Column('uuid', { nullable: true }) runId: string | null;
+  @Column('uuid', { nullable: true }) flowRunId: string | null;
   @Column('text') kind: string;
   @Column('text') name: string;
   @Column('bytea', { nullable: true }) content: Buffer | null;

@@ -7,24 +7,14 @@ import type { DataSource } from 'typeorm';
 import { loadEnv } from '../../src/config/env';
 import { NotificationsService } from '../../src/contexts/notifications/application/notifications.service';
 import { SecretProvisioningService } from '../../src/contexts/projects/application/projects.service';
-import {
-  TypeormProjectRepository,
-  TypeormSecretRepository,
-} from '../../src/contexts/projects/infrastructure/typeorm-repositories';
+import { TypeormProjectRepository, TypeormSecretRepository } from '../../src/contexts/projects/infrastructure/typeorm-repositories';
 import { GithubClient } from '../../src/contexts/scm/infrastructure/github-client';
 import { GitCli } from '../../src/contexts/scm/infrastructure/git-cli';
 import { ScmService } from '../../src/contexts/scm/application/scm.service';
 import { TypeormArtifactRepository } from '../../src/contexts/execution/infrastructure/typeorm-repositories';
 import { TaskSyncService } from '../../src/contexts/tasking/application/task-sync.service';
-import {
-  FileTasksProvider,
-  GithubIssuesProvider,
-  JiraProvider,
-} from '../../src/contexts/tasking/infrastructure/providers';
-import {
-  TypeormTaskRepository,
-  TypeormTaskSourceRepository,
-} from '../../src/contexts/tasking/infrastructure/typeorm-repositories';
+import { FileTasksProvider, GithubIssuesProvider, JiraProvider } from '../../src/contexts/tasking/infrastructure/providers';
+import { TypeormTaskRepository, TypeormTaskSourceRepository } from '../../src/contexts/tasking/infrastructure/typeorm-repositories';
 import { UnitOfWork } from '../../src/database/unit-of-work';
 import { SecretBox, type SecretBoxService } from '../../src/shared/crypto/secret-box';
 import { OutboxDispatcher } from '../../src/shared/outbox/outbox-dispatcher.service';
@@ -134,18 +124,9 @@ describe('Phase 7 e2e: tasking — sync, board, SSE, write-back', () => {
     dispatcher.start();
 
     const secretBox = new SecretBox(TEST_KEY) as SecretBoxService;
-    const secretProvisioning = new SecretProvisioningService(
-      new TypeormSecretRepository(ds),
-      secretBox,
-    );
+    const secretProvisioning = new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox);
     const projectRepo = new TypeormProjectRepository(ds);
-    const scm = new ScmService(
-      env,
-      new TypeormArtifactRepository(ds),
-      new GitCli(),
-      new GithubClient(),
-      secretProvisioning,
-    );
+    const scm = new ScmService(env, new TypeormArtifactRepository(ds), new GitCli(), new GithubClient(), secretProvisioning);
     const taskSync = new TaskSyncService(
       new TypeormTaskSourceRepository(ds),
       new TypeormTaskRepository(ds),
@@ -162,11 +143,7 @@ describe('Phase 7 e2e: tasking — sync, board, SSE, write-back', () => {
       },
       { connection: new IORedis(testApp.redis.url, { maxRetriesPerRequest: null }), concurrency: 2 },
     );
-    notifications = new NotificationsService(
-      projectRepo,
-      new GithubClient(),
-      secretProvisioning,
-    );
+    notifications = new NotificationsService(projectRepo, new GithubClient(), secretProvisioning);
   }, 300_000);
 
   afterAll(async () => {
@@ -208,10 +185,7 @@ describe('Phase 7 e2e: tasking — sync, board, SSE, write-back', () => {
       let pendingRead: ReturnType<typeof reader.read> | null = null;
       while (Date.now() < deadline && sseMessages.length === 0) {
         pendingRead ??= reader.read();
-        const chunk = await Promise.race([
-          pendingRead,
-          new Promise<null>((r) => setTimeout(() => r(null), 300)),
-        ]);
+        const chunk = await Promise.race([pendingRead, new Promise<null>((r) => setTimeout(() => r(null), 300))]);
         if (chunk === null) continue;
         pendingRead = null;
         if (chunk.done) break;
@@ -294,9 +268,7 @@ describe('Phase 7 e2e: tasking — sync, board, SSE, write-back', () => {
     };
     expect(page1.tasks).toHaveLength(3);
     expect(page1.nextCursor).not.toBeNull();
-    const page2 = (
-      await http_.get(`/tasks?projectId=${projectId}&limit=3&cursor=${page1.nextCursor}`)
-    ).body as { tasks: Array<{ id: string }> };
+    const page2 = (await http_.get(`/tasks?projectId=${projectId}&limit=3&cursor=${page1.nextCursor}`)).body as { tasks: Array<{ id: string }> };
     expect(page2.tasks.length).toBeGreaterThanOrEqual(3);
     const ids = new Set([...page1.tasks, ...page2.tasks].map((t) => t.id));
     expect(ids.size).toBe(page1.tasks.length + page2.tasks.length); // no overlap

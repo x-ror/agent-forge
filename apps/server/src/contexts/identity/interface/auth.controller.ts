@@ -1,19 +1,8 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import {
-  loginRequestSchema,
-  registerRequestSchema,
-  type LoginRequest,
-  type RegisterRequest,
-  type UserDto,
-} from '@agentforge/core';
+import { loginRequestSchema, registerRequestSchema, type LoginRequest, type RegisterRequest, type UserDto } from '@agentforge/core';
 import { CurrentUser, Public, type AuthUser } from '../../../shared/http/auth.decorators';
-import {
-  clearSessionCookie,
-  parseCookies,
-  SESSION_COOKIE,
-  setSessionCookie,
-} from '../../../shared/http/cookies';
+import { clearSessionCookie, parseCookies, SESSION_COOKIE, setSessionCookie } from '../../../shared/http/cookies';
 import { ZodValidationPipe } from '../../../shared/http/zod-validation.pipe';
 import type { User } from '../domain/user';
 import { AuthService, SESSION_TTL_SECONDS } from '../application/auth.service';
@@ -28,10 +17,7 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  async register(
-    @Body(new ZodValidationPipe(registerRequestSchema)) body: RegisterRequest,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<UserDto> {
+  async register(@Body(new ZodValidationPipe(registerRequestSchema)) body: RegisterRequest, @Res({ passthrough: true }) res: Response): Promise<UserDto> {
     const { user, sessionToken } = await this.auth.register(body.email, body.password);
     setSessionCookie(res, sessionToken, SESSION_TTL_SECONDS);
     return toUserDto(user);
@@ -40,10 +26,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
-  async login(
-    @Body(new ZodValidationPipe(loginRequestSchema)) body: LoginRequest,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<UserDto> {
+  async login(@Body(new ZodValidationPipe(loginRequestSchema)) body: LoginRequest, @Res({ passthrough: true }) res: Response): Promise<UserDto> {
     const { user, sessionToken } = await this.auth.login(body.email, body.password);
     setSessionCookie(res, sessionToken, SESSION_TTL_SECONDS);
     return toUserDto(user);

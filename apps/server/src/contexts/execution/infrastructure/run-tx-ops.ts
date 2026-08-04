@@ -30,27 +30,18 @@ export class RunTxOps implements RunTxPort {
     });
   }
 
-  async saveRunAndEvents(
-    run: Run,
-    events: Array<{ type: string; payload: Json }>,
-    integrationEvents: IntegrationEvent[] = [],
-  ): Promise<RunEvent[]> {
+  async saveRunAndEvents(run: Run, events: Array<{ type: string; payload: Json }>, integrationEvents: IntegrationEvent[] = []): Promise<RunEvent[]> {
     return this.uow.withTx(async (em) => {
       await em.getRepository(RunEntity).update({ id: run.id }, toRow<RunEntity>(run.snapshot()));
 
       let appended: RunEvent[] = [];
       const outboxEvents = [...integrationEvents];
       if (events.length > 0) {
-        const [row]: Array<{ last: string }> = await em.query(
-          `SELECT COALESCE(MAX(seq), 0) AS last FROM run_events WHERE run_id = $1`,
-          [run.id],
-        );
+        const [row]: Array<{ last: string }> = await em.query(`SELECT COALESCE(MAX(seq), 0) AS last FROM run_events WHERE run_id = $1`, [run.id]);
         let seq = Number(row!.last);
         const ts = new Date();
         appended = events.map((e) => ({ runId: run.id, seq: ++seq, ts, ...e }));
-        await em
-          .getRepository(RunEventEntity)
-          .insert(toRows<RunEventEntity>(appended.map((e) => ({ ...e }))));
+        await em.getRepository(RunEventEntity).insert(toRows<RunEventEntity>(appended.map((e) => ({ ...e }))));
         outboxEvents.push({
           aggregateType: 'run',
           aggregateId: run.id,
@@ -64,9 +55,7 @@ export class RunTxOps implements RunTxPort {
   }
 
   async flowRunIdFor(runId: string): Promise<string | null> {
-    const rows: Array<{ flow_run_id: string }> = await this.uow.withTx((em) =>
-      em.query(`SELECT flow_run_id FROM flow_steps WHERE run_id = $1 LIMIT 1`, [runId]),
-    );
+    const rows: Array<{ flow_run_id: string }> = await this.uow.withTx((em) => em.query(`SELECT flow_run_id FROM flow_steps WHERE run_id = $1 LIMIT 1`, [runId]));
     return rows[0]?.flow_run_id ?? null;
   }
 }

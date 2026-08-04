@@ -5,12 +5,7 @@ import { DATA_SOURCE } from '../../../database/database.module';
 import { toRow, toRows } from '../../../database/row';
 import { Run, type RunStatus } from '../domain/run';
 import type { Artifact, RunEvent, RunInput } from '../domain/run-event';
-import type {
-  ArtifactRepository,
-  RunEventRepository,
-  RunInputRepository,
-  RunRepository,
-} from '../domain/repositories';
+import type { ArtifactRepository, RunEventRepository, RunInputRepository, RunRepository } from '../domain/repositories';
 import { ArtifactEntity, RunEntity, RunEventEntity, RunInputEntity } from './entities';
 
 const RECOVERABLE_STATUSES: RunStatus[] = ['provisioning', 'running', 'awaiting_input', 'finalizing'];
@@ -20,6 +15,7 @@ function toDomain(entity: RunEntity): Run {
     ...entity,
     usage: entity.usage as Run['usage'],
     resumeState: (entity.resumeState ?? null) as Json | null,
+    structured: (entity.structured ?? null) as Json | null,
   });
 }
 
@@ -60,16 +56,10 @@ export class TypeormRunEventRepository implements RunEventRepository {
    * events; the (run_id, seq) PK turns any violated assumption into a loud
    * conflict instead of silent interleaving.
    */
-  async append(
-    runId: string,
-    events: Array<{ type: string; payload: Json }>,
-  ): Promise<RunEvent[]> {
+  async append(runId: string, events: Array<{ type: string; payload: Json }>): Promise<RunEvent[]> {
     if (events.length === 0) return [];
     return this.ds.transaction(async (em) => {
-      const [row]: Array<{ last: string }> = await em.query(
-        `SELECT COALESCE(MAX(seq), 0) AS last FROM run_events WHERE run_id = $1`,
-        [runId],
-      );
+      const [row]: Array<{ last: string }> = await em.query(`SELECT COALESCE(MAX(seq), 0) AS last FROM run_events WHERE run_id = $1`, [runId]);
       let seq = Number(row!.last);
       const ts = new Date();
       const rows: RunEvent[] = events.map((e) => ({ runId, seq: ++seq, ts, ...e }));
@@ -90,10 +80,7 @@ export class TypeormRunEventRepository implements RunEventRepository {
   }
 
   async lastSeq(runId: string): Promise<number> {
-    const [row]: Array<{ last: string }> = await this.ds.query(
-      `SELECT COALESCE(MAX(seq), 0) AS last FROM run_events WHERE run_id = $1`,
-      [runId],
-    );
+    const [row]: Array<{ last: string }> = await this.ds.query(`SELECT COALESCE(MAX(seq), 0) AS last FROM run_events WHERE run_id = $1`, [runId]);
     return Number(row!.last);
   }
 }
@@ -135,9 +122,7 @@ export class TypeormArtifactRepository implements ArtifactRepository {
   }
 
   async listByRun(runId: string): Promise<Artifact[]> {
-    const rows = await this.ds
-      .getRepository(ArtifactEntity)
-      .find({ where: { runId: In([runId]) }, order: { createdAt: 'ASC' } });
+    const rows = await this.ds.getRepository(ArtifactEntity).find({ where: { runId: In([runId]) }, order: { createdAt: 'ASC' } });
     return rows.map((r) => ({ ...r, kind: r.kind as Artifact['kind'], meta: r.meta as Artifact['meta'] }));
   }
 }

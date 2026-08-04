@@ -6,10 +6,7 @@ const GIT_TIMEOUT_MS = 120_000;
 
 @Injectable()
 export class GitCli {
-  async run(
-    args: string[],
-    opts: { cwd?: string; env?: Record<string, string>; allowFail?: boolean } = {},
-  ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  async run(args: string[], opts: { cwd?: string; env?: Record<string, string>; allowFail?: boolean } = {}): Promise<{ exitCode: number; stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
       execFile(
         'git',
@@ -31,12 +28,7 @@ export class GitCli {
         (error, stdout, stderr) => {
           const exitCode = error ? ((error as { code?: number }).code ?? 1) : 0;
           if (error && !opts.allowFail) {
-            reject(
-              new ScmError(
-                `git ${args.slice(0, 3).join(' ')} failed (exit ${exitCode}): ${stderr.slice(0, 500)}`,
-                stderr,
-              ),
-            );
+            reject(new ScmError(`git ${args.slice(0, 3).join(' ')} failed (exit ${exitCode}): ${stderr.slice(0, 500)}`, stderr));
             return;
           }
           resolve({ exitCode: typeof exitCode === 'number' ? exitCode : 1, stdout, stderr });

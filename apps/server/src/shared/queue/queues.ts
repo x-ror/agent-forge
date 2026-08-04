@@ -1,15 +1,7 @@
 import type { JobsOptions } from 'bullmq';
 
 /** Queue topology (§5.2). Payloads are IDs only — Postgres is the truth. */
-export const QUEUE_NAMES = [
-  'flow.advance',
-  'run.execute',
-  'run.finalize',
-  'task.sync',
-  'repo.sync',
-  'maintenance.cleanup',
-  'notify.deliver',
-] as const;
+export const QUEUE_NAMES = ['flow.advance', 'run.execute', 'run.finalize', 'task.sync', 'repo.sync', 'maintenance.cleanup', 'notify.deliver'] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
 

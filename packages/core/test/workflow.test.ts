@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  collectReferencedAgents,
-  validateWorkflowGraph,
-  workflowDefinitionSchema,
-  type WorkflowDefinition,
-} from '../src';
+import { collectReferencedAgents, validateWorkflowGraph, workflowDefinitionSchema, type WorkflowDefinition } from '../src';
 
 /** The canonical example from design doc §7.2 — must always validate. */
 export const canonicalWorkflow: WorkflowDefinition = {

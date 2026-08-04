@@ -37,15 +37,9 @@ export class ReconciliationService {
     const report: ReconciliationReport = { requeuedRuns: 0, requeuedFlows: 0, staleActiveRuns: 0 };
     try {
       // Queued runs must always have an execute job (jobId dedupes).
-      const queuedRuns: Array<{ id: string }> = await this.ds.query(
-        `SELECT id FROM runs WHERE status = 'queued'`,
-      );
+      const queuedRuns: Array<{ id: string }> = await this.ds.query(`SELECT id FROM runs WHERE status = 'queued'`);
       for (const { id } of queuedRuns) {
-        await this.queues['run.execute'].add(
-          'run.execute',
-          { runId: id },
-          { jobId: `run.execute__${id}` },
-        );
+        await this.queues['run.execute'].add('run.execute', { runId: id }, { jobId: `run.execute__${id}` });
         report.requeuedRuns += 1;
       }
 
@@ -58,11 +52,7 @@ export class ReconciliationService {
                WHERE s.flow_run_id = f.id AND s.status IN ('running','awaiting_input'))`,
       );
       for (const { id } of stalledFlows) {
-        await this.queues['flow.advance'].add(
-          'flow.advance',
-          { flowRunId: id, event: 'reconcile' },
-          { jobId: `flow.advance__${id}__reconcile` },
-        );
+        await this.queues['flow.advance'].add('flow.advance', { flowRunId: id, event: 'reconcile' }, { jobId: `flow.advance__${id}__reconcile` });
         report.requeuedFlows += 1;
       }
 
@@ -77,11 +67,7 @@ export class ReconciliationService {
       // Time-bucketed jobId: retryable later, deduped within the window.
       const bucket = Math.floor(Date.now() / 300_000);
       for (const { id } of stale) {
-        await this.queues['run.execute'].add(
-          'run.execute',
-          { runId: id },
-          { jobId: `run.execute__${id}__recover__${bucket}` },
-        );
+        await this.queues['run.execute'].add('run.execute', { runId: id }, { jobId: `run.execute__${id}__recover__${bucket}` });
       }
       if (report.staleActiveRuns > 0) {
         this.logger.warn(`${report.staleActiveRuns} stale run(s) queued for recovery`);

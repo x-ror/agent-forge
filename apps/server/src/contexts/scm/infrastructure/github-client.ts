@@ -39,27 +39,18 @@ export class GithubClient {
     return { url: body.html_url, number: body.number };
   }
 
-  async commentOnIssue(args: {
-    apiBase?: string;
-    token: string;
-    repo: GithubRepo;
-    issueNumber: number;
-    body: string;
-  }): Promise<void> {
+  async commentOnIssue(args: { apiBase?: string; token: string; repo: GithubRepo; issueNumber: number; body: string }): Promise<void> {
     const apiBase = (args.apiBase ?? 'https://api.github.com').replace(/\/$/, '');
-    const res = await fetch(
-      `${apiBase}/repos/${args.repo.owner}/${args.repo.repo}/issues/${args.issueNumber}/comments`,
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${args.token}`,
-          accept: 'application/vnd.github+json',
-          'content-type': 'application/json',
-          'user-agent': 'agentforge',
-        },
-        body: JSON.stringify({ body: args.body }),
+    const res = await fetch(`${apiBase}/repos/${args.repo.owner}/${args.repo.repo}/issues/${args.issueNumber}/comments`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${args.token}`,
+        accept: 'application/vnd.github+json',
+        'content-type': 'application/json',
+        'user-agent': 'agentforge',
       },
-    );
+      body: JSON.stringify({ body: args.body }),
+    });
     if (!res.ok) {
       throw new ScmError(`github comment failed: ${res.status}`, await res.text());
     }

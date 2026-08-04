@@ -36,9 +36,7 @@ export class TypeormTaskSourceRepository implements TaskSourceRepository {
   }
 
   async listWithCron(): Promise<TaskSource[]> {
-    const rows = await this.ds
-      .getRepository(TaskSourceEntity)
-      .find({ where: { syncCron: Not(IsNull()) } });
+    const rows = await this.ds.getRepository(TaskSourceEntity).find({ where: { syncCron: Not(IsNull()) } });
     return rows.map(sourceToDomain);
   }
 
@@ -68,9 +66,7 @@ export class TypeormTaskRepository implements TaskRepository {
    * Sync upsert on (source_id, external_key). Board lifecycle (status) is
    * owned locally, so re-sync refreshes content but never resets status.
    */
-  async upsertSynced(
-    task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id: string },
-  ): Promise<string> {
+  async upsertSynced(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id: string }): Promise<string> {
     const rows: Array<{ id: string }> = await this.ds.query(
       `INSERT INTO tasks (id, project_id, source_id, external_key, title, body, status, meta)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -78,24 +74,12 @@ export class TypeormTaskRepository implements TaskRepository {
        DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body,
                      meta = EXCLUDED.meta, updated_at = now()
        RETURNING id`,
-      [
-        task.id,
-        task.projectId,
-        task.sourceId,
-        task.externalKey,
-        task.title,
-        task.body,
-        task.status,
-        JSON.stringify(task.meta),
-      ],
+      [task.id, task.projectId, task.sourceId, task.externalKey, task.title, task.body, task.status, JSON.stringify(task.meta)],
     );
     return rows[0]!.id;
   }
 
-  async listBoard(
-    projectId: string,
-    opts: { status?: TaskStatus; cursor?: string; limit?: number } = {},
-  ): Promise<Task[]> {
+  async listBoard(projectId: string, opts: { status?: TaskStatus; cursor?: string; limit?: number } = {}): Promise<Task[]> {
     const qb = this.ds
       .getRepository(TaskEntity)
       .createQueryBuilder('t')

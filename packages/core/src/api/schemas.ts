@@ -160,16 +160,7 @@ export const taskDtoSchema = z.object({
 export type TaskDto = z.infer<typeof taskDtoSchema>;
 
 // ---- Runs ------------------------------------------------------------------
-export const runStatusSchema = z.enum([
-  'queued',
-  'provisioning',
-  'running',
-  'awaiting_input',
-  'finalizing',
-  'succeeded',
-  'failed',
-  'cancelled',
-]);
+export const runStatusSchema = z.enum(['queued', 'provisioning', 'running', 'awaiting_input', 'finalizing', 'succeeded', 'failed', 'cancelled']);
 export type RunStatusDto = z.infer<typeof runStatusSchema>;
 
 export const createRunRequestSchema = z.object({
@@ -223,8 +214,6 @@ export const problemDetailsSchema = z.object({
   title: z.string(),
   status: z.number().int(),
   detail: z.string().optional(),
-  errors: z
-    .array(z.object({ path: z.string(), message: z.string() }))
-    .optional(),
+  errors: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
 });
 export type ProblemDetails = z.infer<typeof problemDetailsSchema>;

@@ -1,10 +1,7 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-type AnthropicBlock =
-  | { type: 'text'; text: string }
-  | { type: 'thinking'; thinking: string }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+type AnthropicBlock = { type: 'text'; text: string } | { type: 'thinking'; thinking: string } | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
 
 interface AnthropicTurn {
   blocks: AnthropicBlock[];

@@ -2,12 +2,7 @@ import { chmodSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ClaudeCodeAdapter } from '../src';
-import {
-  collectEvents,
-  expectEventOrder,
-  LocalSandbox,
-  makeRunContext,
-} from '../src/conformance';
+import { collectEvents, expectEventOrder, LocalSandbox, makeRunContext } from '../src/conformance';
 
 const CLI = path.join(__dirname, 'fixtures', 'mock-claude.cjs');
 chmodSync(CLI, 0o755);
@@ -24,11 +19,7 @@ describe('claude-code conformance', () => {
   it('--version handshake fails loudly for a broken CLI', async () => {
     const sandbox = await LocalSandbox.create();
     const adapter = new ClaudeCodeAdapter();
-    await expect(
-      adapter.start(
-        makeRunContext({ sandbox, config: { options: { cliPath: '/bin/false' } } }),
-      ),
-    ).rejects.toThrow(/--version.*failed/);
+    await expect(adapter.start(makeRunContext({ sandbox, config: { options: { cliPath: '/bin/false' } } }))).rejects.toThrow(/--version.*failed/);
   });
 
   it('golden event sequence maps the stream-json protocol to the 9-event union', async () => {
@@ -37,17 +28,7 @@ describe('claude-code conformance', () => {
     const handle = await adapter.start(ctxFor(sandbox, 'golden'));
     const events = await collectEvents(handle);
 
-    expectEventOrder(events, [
-      'agent.thinking',
-      'agent.message',
-      'tool.start',
-      'tool.end',
-      'tool.start',
-      'file.change',
-      'tool.end',
-      'usage',
-      'result',
-    ]);
+    expectEventOrder(events, ['agent.thinking', 'agent.message', 'tool.start', 'tool.end', 'tool.start', 'file.change', 'tool.end', 'usage', 'result']);
     const usage = events.find((e) => e.type === 'usage');
     expect(usage && 'costUsd' in usage && usage.costUsd).toBeCloseTo(0.0421);
     const fileChange = events.find((e) => e.type === 'file.change');
@@ -84,9 +65,7 @@ describe('claude-code conformance', () => {
       },
     });
     const denyResult = denyEvents.find((e) => e.type === 'result');
-    expect(denyResult && 'summary' in denyResult && denyResult.summary).toBe(
-      'skipped dangerous command',
-    );
+    expect(denyResult && 'summary' in denyResult && denyResult.summary).toBe('skipped dangerous command');
     expect(denyEvents.some((e) => e.type === 'tool.start')).toBe(false);
   });
 

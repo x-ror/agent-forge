@@ -1,10 +1,5 @@
 import { EventEmitter } from 'node:events';
-import {
-  Inject,
-  Injectable,
-  type OnApplicationShutdown,
-  type OnModuleInit,
-} from '@nestjs/common';
+import { Inject, Injectable, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import type { Redis } from 'ioredis';
 import { REDIS } from '../redis/redis.module';
 import { PUBSUB_CHANNEL, type PubSubMessage } from '../outbox/integration-event';
@@ -42,11 +37,7 @@ export class PubSubListener implements OnModuleInit, OnApplicationShutdown {
     }
   }
 
-  onAggregate(
-    aggregateType: string,
-    aggregateId: string,
-    handler: (message: PubSubMessage) => void,
-  ): () => void {
+  onAggregate(aggregateType: string, aggregateId: string, handler: (message: PubSubMessage) => void): () => void {
     const key = `${aggregateType}:${aggregateId}`;
     this.emitter.on(key, handler);
     return () => this.emitter.off(key, handler);

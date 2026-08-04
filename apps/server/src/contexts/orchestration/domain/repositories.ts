@@ -25,11 +25,7 @@ export interface FlowStepRepository {
   findByRunId(runId: string): Promise<FlowStep | null>;
   listByFlowRun(flowRunId: string): Promise<FlowStep[]>;
   listActiveByFlowRun(flowRunId: string): Promise<FlowStep[]>;
-  updateStatus(
-    id: string,
-    status: FlowStepStatus,
-    opts?: { decision?: FlowStepDecision; finishedAt?: Date },
-  ): Promise<void>;
+  updateStatus(id: string, status: FlowStepStatus, opts?: { decision?: FlowStepDecision; finishedAt?: Date }): Promise<void>;
 }
 
 export interface ScheduleRepository {

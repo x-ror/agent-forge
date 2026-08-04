@@ -68,9 +68,7 @@ const usage = { input_tokens: 42, output_tokens: 17 };
     emit({
       type: 'assistant',
       message: {
-        content: [
-          { type: 'tool_use', id: 'tu2', name: 'Write', input: { file_path: 'a.txt', content: 'x' } },
-        ],
+        content: [{ type: 'tool_use', id: 'tu2', name: 'Write', input: { file_path: 'a.txt', content: 'x' } }],
       },
     });
     emit({
@@ -98,8 +96,7 @@ const usage = { input_tokens: 42, output_tokens: 17 };
       response = await nextMessage();
       if (response.type === 'control_response') break;
     }
-    const behavior =
-      response.response && response.response.response && response.response.response.behavior;
+    const behavior = response.response && response.response.response && response.response.response.behavior;
     if (behavior === 'allow') {
       emit({
         type: 'assistant',

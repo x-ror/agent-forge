@@ -3,12 +3,7 @@ import { In, type DataSource } from 'typeorm';
 import { DATA_SOURCE } from '../../../database/database.module';
 import { FlowRun, type FlowContext } from '../domain/flow-run';
 import type { FlowStep, FlowStepDecision, FlowStepStatus } from '../domain/flow-step';
-import type {
-  FlowRunRepository,
-  FlowStepRepository,
-  ScheduleRepository,
-  WorkflowRepository,
-} from '../domain/repositories';
+import type { FlowRunRepository, FlowStepRepository, ScheduleRepository, WorkflowRepository } from '../domain/repositories';
 import type { Schedule, Workflow } from '../domain/workflow';
 import { FlowRunEntity, FlowStepEntity, ScheduleEntity, WorkflowEntity } from './entities';
 
@@ -68,18 +63,12 @@ export class TypeormFlowRunRepository implements FlowRunRepository {
   }
 
   async listActive(): Promise<FlowRun[]> {
-    const rows = await this.ds
-      .getRepository(FlowRunEntity)
-      .findBy({ status: In(['running', 'awaiting_input']) });
+    const rows = await this.ds.getRepository(FlowRunEntity).findBy({ status: In(['running', 'awaiting_input']) });
     return rows.map((row) => FlowRun.restore({ ...row, context: row.context as FlowContext }));
   }
 
   async list(limit: number, cursor?: string): Promise<FlowRun[]> {
-    const qb = this.ds
-      .getRepository(FlowRunEntity)
-      .createQueryBuilder('f')
-      .orderBy('f.id', 'DESC')
-      .limit(Math.min(limit, 200));
+    const qb = this.ds.getRepository(FlowRunEntity).createQueryBuilder('f').orderBy('f.id', 'DESC').limit(Math.min(limit, 200));
     if (cursor) qb.where('f.id < :cursor', { cursor });
     const rows = await qb.getMany();
     return rows.map((row) => FlowRun.restore({ ...row, context: row.context as FlowContext }));
@@ -105,22 +94,14 @@ export class TypeormFlowStepRepository implements FlowStepRepository {
   }
 
   async listByFlowRun(flowRunId: string): Promise<FlowStep[]> {
-    return this.ds
-      .getRepository(FlowStepEntity)
-      .find({ where: { flowRunId }, order: { startedAt: 'ASC', id: 'ASC' } });
+    return this.ds.getRepository(FlowStepEntity).find({ where: { flowRunId }, order: { startedAt: 'ASC', id: 'ASC' } });
   }
 
   async listActiveByFlowRun(flowRunId: string): Promise<FlowStep[]> {
-    return this.ds
-      .getRepository(FlowStepEntity)
-      .findBy({ flowRunId, status: In(['running', 'awaiting_input']) });
+    return this.ds.getRepository(FlowStepEntity).findBy({ flowRunId, status: In(['running', 'awaiting_input']) });
   }
 
-  async updateStatus(
-    id: string,
-    status: FlowStepStatus,
-    opts: { decision?: FlowStepDecision; finishedAt?: Date } = {},
-  ): Promise<void> {
+  async updateStatus(id: string, status: FlowStepStatus, opts: { decision?: FlowStepDecision; finishedAt?: Date } = {}): Promise<void> {
     await this.ds.getRepository(FlowStepEntity).update(
       { id },
       {

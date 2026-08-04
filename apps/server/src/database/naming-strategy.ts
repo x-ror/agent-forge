@@ -10,11 +10,7 @@ export class SnakeNamingStrategy extends DefaultNamingStrategy implements Naming
     return customName ?? snakeCase(className);
   }
 
-  override columnName(
-    propertyName: string,
-    customName: string | undefined,
-    embeddedPrefixes: string[],
-  ): string {
+  override columnName(propertyName: string, customName: string | undefined, embeddedPrefixes: string[]): string {
     return snakeCase(embeddedPrefixes.concat(customName ?? propertyName).join('_'));
   }
 

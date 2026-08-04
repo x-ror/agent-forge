@@ -12,11 +12,7 @@ export interface PgTestContext {
 
 /** Starts a PG 18 container and applies all migrations (admin), returning both URLs. */
 export async function startMigratedPg(): Promise<PgTestContext> {
-  const container = await new PostgreSqlContainer('postgres:18')
-    .withDatabase('agentforge')
-    .withUsername('postgres')
-    .withPassword('postgres')
-    .start();
+  const container = await new PostgreSqlContainer('postgres:18').withDatabase('agentforge').withUsername('postgres').withPassword('postgres').start();
   const adminUrl = container.getConnectionUri();
   await runMigrations(adminUrl);
   const appUrl = `postgres://agentforge_app:agentforge_app@${container.getHost()}:${container.getMappedPort(5432)}/agentforge`;

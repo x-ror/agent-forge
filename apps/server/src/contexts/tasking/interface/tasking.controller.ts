@@ -1,17 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  Res,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import {
   createTaskRequestSchema,
@@ -62,19 +49,13 @@ export class TaskSourcesController {
   constructor(private readonly tasks: TasksService) {}
 
   @Get()
-  async list(
-    @CurrentUser() user: AuthUser,
-    @Query('projectId') projectId: string,
-  ): Promise<TaskSourceDto[]> {
+  async list(@CurrentUser() user: AuthUser, @Query('projectId') projectId: string): Promise<TaskSourceDto[]> {
     if (!projectId) throw new BadRequestException('projectId query param required');
     return (await this.tasks.listSources(user.userId, projectId)).map(sourceToDto);
   }
 
   @Post()
-  async create(
-    @CurrentUser() user: AuthUser,
-    @Body(new ZodValidationPipe(createTaskSourceRequestSchema)) body: CreateTaskSourceRequest,
-  ): Promise<TaskSourceDto> {
+  async create(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(createTaskSourceRequestSchema)) body: CreateTaskSourceRequest): Promise<TaskSourceDto> {
     return sourceToDto(await this.tasks.createSource(user.userId, body));
   }
 
@@ -123,10 +104,7 @@ export class TasksController {
   }
 
   @Post()
-  async create(
-    @CurrentUser() user: AuthUser,
-    @Body(new ZodValidationPipe(createTaskRequestSchema)) body: CreateTaskRequest,
-  ): Promise<TaskDto> {
+  async create(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(createTaskRequestSchema)) body: CreateTaskRequest): Promise<TaskDto> {
     return taskToDto(await this.tasks.createTask(user.userId, body));
   }
 
@@ -136,11 +114,7 @@ export class TasksController {
   }
 
   @Patch(':id')
-  async update(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(updateTaskRequestSchema)) body: UpdateTaskRequest,
-  ): Promise<TaskDto> {
+  async update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodValidationPipe(updateTaskRequestSchema)) body: UpdateTaskRequest): Promise<TaskDto> {
     return taskToDto(await this.tasks.updateTask(user.userId, id, body));
   }
 
@@ -149,12 +123,7 @@ export class TasksController {
    * one project. Stateless (no cursor) — clients refetch the board on wake-up.
    */
   @Get('stream/:projectId')
-  async stream(
-    @CurrentUser() user: AuthUser,
-    @Param('projectId') projectId: string,
-    @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
+  async stream(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string, @Req() req: Request, @Res() res: Response): Promise<void> {
     await this.projects.getOwned(user.userId, projectId);
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream');
@@ -164,10 +133,7 @@ export class TasksController {
 
     const unsubscribe = this.pubsub.onAny((message) => {
       const payload = message.payload as { projectId?: string } | null;
-      if (
-        (message.eventType === 'task.synced' || message.eventType === 'task.status_changed') &&
-        payload?.projectId === projectId
-      ) {
+      if ((message.eventType === 'task.synced' || message.eventType === 'task.status_changed') && payload?.projectId === projectId) {
         res.write(`data: ${JSON.stringify(message)}\n\n`);
       }
     });

@@ -1,13 +1,5 @@
 import type { Json } from '../json';
-import type {
-  AgentAdapter,
-  AgentHandle,
-  AdapterCapabilities,
-  ResumeState,
-  RunContext,
-  StopReason,
-  UserMessage,
-} from '../protocol/adapter';
+import type { AgentAdapter, AgentHandle, AdapterCapabilities, ResumeState, RunContext, StopReason, UserMessage } from '../protocol/adapter';
 import { EventChannel, Gate } from './util';
 
 /**
@@ -145,7 +137,10 @@ class OpenAiCompatibleProvider implements ChatProvider {
     const messages: Array<Record<string, unknown>> = [{ role: 'system', content: args.system }];
     for (const m of args.messages) {
       if (m.role === 'assistant') {
-        const text = m.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+        const text = m.content
+          .filter((b) => b.type === 'text')
+          .map((b) => b.text)
+          .join('\n');
         const toolCalls = m.content
           .filter((b) => b.type === 'tool_use')
           .map((b) => ({
@@ -260,8 +255,7 @@ function toolDefs(structuredRoutes: string[] | undefined): ToolDef[] {
   if (structuredRoutes) {
     tools.push({
       name: 'decide',
-      description:
-        'Record your final decision. You MUST call this exactly once when you have decided.',
+      description: 'Record your final decision. You MUST call this exactly once when you have decided.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -315,9 +309,7 @@ class ApiLoopHandle implements AgentHandle {
     private readonly options: ApiLoopOptions,
     resume?: ApiLoopResumeData,
   ) {
-    this.transcript = resume?.transcript ?? [
-      { role: 'user', content: [{ type: 'text', text: ctx.prompt }] },
-    ];
+    this.transcript = resume?.transcript ?? [{ role: 'user', content: [{ type: 'text', text: ctx.prompt }] }];
     void this.run();
   }
 
@@ -347,9 +339,7 @@ class ApiLoopHandle implements AgentHandle {
     return [
       `You are an autonomous coding agent working in a sandboxed workspace.`,
       `Use the provided tools to inspect and modify the code.`,
-      allowed
-        ? `Commands matching these prefixes run without approval: ${allowed.join(', ') || '(none)'}. Other commands require user approval.`
-        : ``,
+      allowed ? `Commands matching these prefixes run without approval: ${allowed.join(', ') || '(none)'}. Other commands require user approval.` : ``,
       this.ctx.structured
         ? `You are making a routing decision. Call the \`decide\` tool exactly once with one of: ${this.ctx.structured.routes.join(', ')}.`
         : `When you are completely done, reply with a plain text summary of what you did (no tool calls).`,
@@ -464,10 +454,7 @@ class ApiLoopHandle implements AgentHandle {
     }
   }
 
-  private async executeTool(
-    name: string,
-    input: Record<string, unknown>,
-  ): Promise<{ output: string; ok: boolean }> {
+  private async executeTool(name: string, input: Record<string, unknown>): Promise<{ output: string; ok: boolean }> {
     const sandbox = this.ctx.sandbox;
     try {
       switch (name) {
@@ -522,10 +509,7 @@ class ApiLoopHandle implements AgentHandle {
         }
         case 'search': {
           const pattern = String(input.pattern ?? '');
-          const result = await sandbox.exec(
-            ['sh', '-c', `grep -rn -e ${JSON.stringify(pattern)} . | head -100`],
-            { timeoutMs: 30_000 },
-          );
+          const result = await sandbox.exec(['sh', '-c', `grep -rn -e ${JSON.stringify(pattern)} . | head -100`], { timeoutMs: 30_000 });
           return { output: result.stdout || '(no matches)', ok: true };
         }
         default:
@@ -566,18 +550,14 @@ function resolveOptions(ctx: RunContext): ApiLoopOptions {
     maxTokens?: number;
   };
   const provider = options.provider === 'openai' ? 'openai' : 'anthropic';
-  const apiKeyEnv =
-    options.apiKeyEnv ?? (provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY');
+  const apiKeyEnv = options.apiKeyEnv ?? (provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY');
   const apiKey = ctx.env[apiKeyEnv];
   if (!apiKey) {
     throw new Error(`api-loop: missing API key (env ${apiKeyEnv} not provisioned)`);
   }
   return {
     provider,
-    baseUrl: (
-      options.baseUrl ??
-      (provider === 'openai' ? 'https://api.openai.com' : 'https://api.anthropic.com')
-    ).replace(/\/$/, ''),
+    baseUrl: (options.baseUrl ?? (provider === 'openai' ? 'https://api.openai.com' : 'https://api.anthropic.com')).replace(/\/$/, ''),
     apiKey,
     maxTurns: options.maxTurns ?? 40,
     maxTokens: options.maxTokens ?? 8192,

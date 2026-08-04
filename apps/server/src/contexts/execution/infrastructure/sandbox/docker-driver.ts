@@ -2,11 +2,7 @@ import { execFile, spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { Injectable, Logger } from '@nestjs/common';
-import type {
-  SandboxExecOptions,
-  SandboxExecResult,
-  SandboxProcess,
-} from '@agentforge/core';
+import type { SandboxExecOptions, SandboxExecResult, SandboxProcess } from '@agentforge/core';
 import type { Sandbox, SandboxDriver, SandboxOptions } from '../../domain/sandbox';
 import { wrapChildProcess } from './process-driver';
 
@@ -39,21 +35,11 @@ class DockerSandbox implements Sandbox {
 
     const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     return new Promise<SandboxExecResult>((resolve) => {
-      const child = execFile(
-        'docker',
-        args,
-        { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, killSignal: 'SIGKILL' },
-        (error, stdout, stderr) => {
-          const killed = Boolean(error && 'killed' in error && error.killed);
-          const code =
-            error && typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === 'number'
-              ? ((error as unknown as { code: number }).code ?? -1)
-              : error
-                ? -1
-                : 0;
-          resolve({ exitCode: killed ? 137 : code, stdout, stderr, timedOut: killed });
-        },
-      );
+      const child = execFile('docker', args, { timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, killSignal: 'SIGKILL' }, (error, stdout, stderr) => {
+        const killed = Boolean(error && 'killed' in error && error.killed);
+        const code = error && typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === 'number' ? ((error as unknown as { code: number }).code ?? -1) : error ? -1 : 0;
+        resolve({ exitCode: killed ? 137 : code, stdout, stderr, timedOut: killed });
+      });
       if (options.stdin !== undefined && child.stdin) {
         child.stdin.write(options.stdin);
         child.stdin.end();
@@ -101,16 +87,7 @@ export class DockerSandboxDriver implements SandboxDriver {
   async create(options: SandboxOptions): Promise<Sandbox> {
     await mkdir(options.workdir, { recursive: true });
     const image = options.image ?? DEFAULT_IMAGE;
-    const args = [
-      'run',
-      '-d',
-      '--label',
-      `agentforge.run=${options.runId}`,
-      '-v',
-      `${options.workdir}:${WORKSPACE_MOUNT}`,
-      '-w',
-      WORKSPACE_MOUNT,
-    ];
+    const args = ['run', '-d', '--label', `agentforge.run=${options.runId}`, '-v', `${options.workdir}:${WORKSPACE_MOUNT}`, '-w', WORKSPACE_MOUNT];
     const policy = options.networkPolicy ?? 'full';
     if (policy === 'none') args.push('--network', 'none');
     if (policy === 'llm-only') {

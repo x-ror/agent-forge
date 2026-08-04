@@ -1,19 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { uuidv7 } from '../../../shared/uuidv7';
-import {
-  PAT_REPOSITORY,
-  SESSION_REPOSITORY,
-  USER_REPOSITORY,
-  type PersonalAccessTokenRepository,
-  type SessionRepository,
-  type UserRepository,
-} from '../domain/repositories';
+import { PAT_REPOSITORY, SESSION_REPOSITORY, USER_REPOSITORY, type PersonalAccessTokenRepository, type SessionRepository, type UserRepository } from '../domain/repositories';
 import { PASSWORD_HASHER, type PasswordHasher } from '../domain/password-hasher';
 import { isSessionExpired, type PersonalAccessToken, type User } from '../domain/user';
 

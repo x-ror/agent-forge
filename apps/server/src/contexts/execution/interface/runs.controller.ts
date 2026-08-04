@@ -1,23 +1,6 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Inject,
-  Param,
-  Post,
-  Query,
-  Req,
-  Res,
-} from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import {
-  createRunRequestSchema,
-  runInputRequestSchema,
-  type CreateRunRequest,
-  type RunDto,
-  type RunEventDto,
-  type RunInputRequest,
-} from '@agentforge/core';
+import { createRunRequestSchema, runInputRequestSchema, type CreateRunRequest, type RunDto, type RunEventDto, type RunInputRequest } from '@agentforge/core';
 import { CurrentUser, type AuthUser } from '../../../shared/http/auth.decorators';
 import { ZodValidationPipe } from '../../../shared/http/zod-validation.pipe';
 import { PubSubListener } from '../../../shared/sse/pubsub-listener.service';
@@ -68,10 +51,7 @@ export class RunsController {
   ) {}
 
   @Post()
-  async create(
-    @CurrentUser() user: AuthUser,
-    @Body(new ZodValidationPipe(createRunRequestSchema)) body: CreateRunRequest,
-  ): Promise<RunDto> {
+  async create(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(createRunRequestSchema)) body: CreateRunRequest): Promise<RunDto> {
     return toDto(await this.runs.create(user.userId, body));
   }
 
@@ -81,21 +61,14 @@ export class RunsController {
   }
 
   @Get(':id/events')
-  async list(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Query('after_seq') afterSeq?: string,
-  ): Promise<RunEventDto[]> {
+  async list(@CurrentUser() user: AuthUser, @Param('id') id: string, @Query('after_seq') afterSeq?: string): Promise<RunEventDto[]> {
     const events = await this.runs.listEvents(user.userId, id, Number(afterSeq ?? 0));
     return events.map(toEventDto);
   }
 
   /** Cumulative diff — served from the finalize-time artifact (api has no workspaces volume). */
   @Get(':id/diff')
-  async diff(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-  ): Promise<{ diff: string; baseRef: string | null }> {
+  async diff(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<{ diff: string; baseRef: string | null }> {
     await this.runs.getAccessible(user.userId, id);
     const artifacts = await this.artifacts.listByRun(id);
     const diff = artifacts.filter((a) => a.kind === 'diff').at(-1);
@@ -105,21 +78,14 @@ export class RunsController {
   }
 
   @Get(':id/artifacts')
-  async listArtifacts(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-  ): Promise<Array<{ id: string; kind: string; name: string; meta: unknown }>> {
+  async listArtifacts(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<Array<{ id: string; kind: string; name: string; meta: unknown }>> {
     await this.runs.getAccessible(user.userId, id);
     const artifacts = await this.artifacts.listByRun(id);
     return artifacts.map((a) => ({ id: a.id, kind: a.kind, name: a.name, meta: a.meta }));
   }
 
   @Post(':id/inputs')
-  async addInput(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(runInputRequestSchema)) body: RunInputRequest,
-  ): Promise<{ id: string }> {
+  async addInput(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodValidationPipe(runInputRequestSchema)) body: RunInputRequest): Promise<{ id: string }> {
     const input = await this.runs.addInput(user.userId, id, body);
     return { id: input.id };
   }
@@ -130,20 +96,11 @@ export class RunsController {
    * AND Redis restarts because every drain reads from Postgres.
    */
   @Get(':id/events/stream')
-  async stream(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Req() req: Request,
-    @Res() res: Response,
-  ): Promise<void> {
+  async stream(@CurrentUser() user: AuthUser, @Param('id') id: string, @Req() req: Request, @Res() res: Response): Promise<void> {
     await this.runs.getAccessible(user.userId, id);
 
     const lastEventId = req.headers['last-event-id'];
-    const afterSeq = Number(
-      (Array.isArray(lastEventId) ? lastEventId[0] : lastEventId) ??
-        (req.query.after_seq as string | undefined) ??
-        0,
-    );
+    const afterSeq = Number((Array.isArray(lastEventId) ? lastEventId[0] : lastEventId) ?? (req.query.after_seq as string | undefined) ?? 0);
 
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream');

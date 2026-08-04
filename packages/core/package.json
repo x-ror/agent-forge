@@ -2,6 +2,9 @@
   "name": "@agentforge/core",
   "version": "0.1.0",
   "description": "AgentForge shared contracts: event protocol, adapter SDK, workflow definition schema, API DTOs",
+  "files": [
+    "dist"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -14,9 +17,6 @@
       "default": "./dist/conformance/index.js"
     }
   },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
@@ -24,11 +24,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "zod": "^4.0.0"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^22.20.1",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }

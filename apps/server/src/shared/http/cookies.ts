@@ -17,10 +17,7 @@ export function parseCookies(req: Request): Record<string, string> {
 }
 
 export function setSessionCookie(res: Response, token: string, maxAgeSeconds: number): void {
-  res.setHeader(
-    'Set-Cookie',
-    `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}`,
-  );
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}`);
 }
 
 export function clearSessionCookie(res: Response): void {

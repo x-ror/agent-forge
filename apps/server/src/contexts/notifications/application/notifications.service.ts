@@ -46,10 +46,7 @@ export class NotificationsService {
     const token = env.GITHUB_TOKEN ?? env.GH_TOKEN;
     if (!token) throw new Error('no GITHUB_TOKEN secret for write-back');
     await this.github.commentOnIssue({
-      apiBase:
-        typeof project.settings.githubApiUrl === 'string'
-          ? project.settings.githubApiUrl
-          : undefined,
+      apiBase: typeof project.settings.githubApiUrl === 'string' ? project.settings.githubApiUrl : undefined,
       token,
       repo,
       issueNumber: event.issueNumber,

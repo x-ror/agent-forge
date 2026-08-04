@@ -1,34 +1,12 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import type {
-  CreateTaskRequest,
-  CreateTaskSourceRequest,
-  Json,
-  UpdateTaskRequest,
-} from '@agentforge/core';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { CreateTaskRequest, CreateTaskSourceRequest, Json, UpdateTaskRequest } from '@agentforge/core';
 import { UnitOfWork } from '../../../database/unit-of-work';
 import { OutboxWriter } from '../../../shared/outbox/outbox.writer';
 import { EventTypes } from '../../../shared/outbox/integration-event';
 import { uuidv7 } from '../../../shared/uuidv7';
 import { ProjectsService } from '../../projects/application/projects.service';
-import {
-  assertTaskTransition,
-  IllegalTaskTransitionError,
-  type Task,
-  type TaskSource,
-  type TaskSourceKind,
-  type TaskStatus,
-} from '../domain/task';
-import {
-  TASK_REPOSITORY,
-  TASK_SOURCE_REPOSITORY,
-  type TaskRepository,
-  type TaskSourceRepository,
-} from '../domain/repositories';
+import { assertTaskTransition, IllegalTaskTransitionError, type Task, type TaskSource, type TaskSourceKind, type TaskStatus } from '../domain/task';
+import { TASK_REPOSITORY, TASK_SOURCE_REPOSITORY, type TaskRepository, type TaskSourceRepository } from '../domain/repositories';
 
 @Injectable()
 export class TasksService {
@@ -105,11 +83,7 @@ export class TasksService {
     return task;
   }
 
-  async board(
-    userId: string,
-    projectId: string,
-    opts: { status?: TaskStatus; cursor?: string; limit?: number },
-  ): Promise<Task[]> {
+  async board(userId: string, projectId: string, opts: { status?: TaskStatus; cursor?: string; limit?: number }): Promise<Task[]> {
     await this.projects.getOwned(userId, projectId);
     return this.tasks.listBoard(projectId, opts);
   }

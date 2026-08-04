@@ -7,10 +7,7 @@ export interface TaskRepository {
   /** Sync upsert on (source_id, external_key); returns the task id. */
   upsertSynced(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id: string }): Promise<string>;
   /** Keyset-paginated board listing (cursor = last task id). */
-  listBoard(
-    projectId: string,
-    opts?: { status?: TaskStatus; cursor?: string; limit?: number },
-  ): Promise<Task[]>;
+  listBoard(projectId: string, opts?: { status?: TaskStatus; cursor?: string; limit?: number }): Promise<Task[]>;
 }
 
 export interface TaskSourceRepository {

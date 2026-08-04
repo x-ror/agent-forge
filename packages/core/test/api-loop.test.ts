@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiLoopAdapter } from '../src';
-import {
-  collectEvents,
-  expectEventOrder,
-  LocalSandbox,
-  makeRunContext,
-} from '../src/conformance';
+import { collectEvents, expectEventOrder, LocalSandbox, makeRunContext } from '../src/conformance';
 import { startMockLlm } from './helpers/mock-llm';
 
 const KEY_ENV = { ANTHROPIC_API_KEY: 'test-key', OPENAI_API_KEY: 'test-key' };
@@ -47,20 +42,7 @@ describe('api-loop conformance', () => {
       const handle = await adapter.start(ctx);
       const events = await collectEvents(handle);
 
-      expectEventOrder(
-        events,
-        [
-          'usage',
-          'agent.thinking',
-          'agent.message',
-          'tool.start',
-          'tool.end',
-          'tool.start',
-          'file.change',
-          'tool.end',
-          'result',
-        ],
-      );
+      expectEventOrder(events, ['usage', 'agent.thinking', 'agent.message', 'tool.start', 'tool.end', 'tool.start', 'file.change', 'tool.end', 'result']);
       const toolEnd = events.find((e) => e.type === 'tool.end');
       expect(toolEnd && 'output' in toolEnd && toolEnd.output).toContain('hello');
       expect(await sandbox.readFile('notes.txt')).toBe('a note');
@@ -101,9 +83,7 @@ describe('api-loop conformance', () => {
 
       // Round 2: allowed → the command actually runs.
       llm.pushAnthropic({
-        blocks: [
-          { type: 'tool_use', id: 'x2', name: 'run_command', input: { command: 'printf approved' } },
-        ],
+        blocks: [{ type: 'tool_use', id: 'x2', name: 'run_command', input: { command: 'printf approved' } }],
       });
       llm.pushAnthropic({ blocks: [{ type: 'text', text: 'done' }] });
       const handle2 = await adapter.start(ctx);
@@ -128,9 +108,7 @@ describe('api-loop conformance', () => {
     try {
       llm.pushAnthropic({ blocks: [{ type: 'text', text: 'slow…' }], delayMs: 5000 });
       const adapter = new ApiLoopAdapter();
-      const handle = await adapter.start(
-        makeRunContext({ sandbox, env: KEY_ENV, config: { options: { baseUrl: llm.url } } }),
-      );
+      const handle = await adapter.start(makeRunContext({ sandbox, env: KEY_ENV, config: { options: { baseUrl: llm.url } } }));
       const started = Date.now();
       setTimeout(() => void handle.stop('cancelled'), 200);
       const events = await collectEvents(handle, { timeoutMs: 10_000 });
@@ -216,9 +194,7 @@ describe('api-loop conformance', () => {
     const sandbox = await LocalSandbox.create();
     try {
       llm.pushAnthropic({
-        blocks: [
-          { type: 'tool_use', id: 'r1', name: 'write_file', input: { path: 'x.txt', content: 'v1' } },
-        ],
+        blocks: [{ type: 'tool_use', id: 'r1', name: 'write_file', input: { path: 'x.txt', content: 'v1' } }],
       });
       const adapter = new ApiLoopAdapter();
       const ctx = makeRunContext({
@@ -242,9 +218,7 @@ describe('api-loop conformance', () => {
       const lastRequest = llm.requests.at(-1) as {
         body: { messages: Array<{ content: Array<{ type: string }> }> };
       };
-      const blockTypes = lastRequest.body.messages.flatMap((m) =>
-        m.content.map((c) => c.type),
-      );
+      const blockTypes = lastRequest.body.messages.flatMap((m) => m.content.map((c) => c.type));
       expect(blockTypes).toContain('tool_use');
       expect(blockTypes).toContain('tool_result');
     } finally {
@@ -255,8 +229,6 @@ describe('api-loop conformance', () => {
   it('missing API key fails at start, loudly', async () => {
     const sandbox = await LocalSandbox.create();
     const adapter = new ApiLoopAdapter();
-    await expect(
-      adapter.start(makeRunContext({ sandbox, env: {}, config: {} })),
-    ).rejects.toThrow(/missing API key/);
+    await expect(adapter.start(makeRunContext({ sandbox, env: {}, config: {} }))).rejects.toThrow(/missing API key/);
   });
 });

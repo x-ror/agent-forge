@@ -1,9 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
-import {
-  createPatRequestSchema,
-  type CreatePatRequest,
-  type PatDto,
-} from '@agentforge/core';
+import { createPatRequestSchema, type CreatePatRequest, type PatDto } from '@agentforge/core';
 import { CurrentUser, type AuthUser } from '../../../shared/http/auth.decorators';
 import { ZodValidationPipe } from '../../../shared/http/zod-validation.pipe';
 import type { PersonalAccessToken } from '../domain/user';
@@ -29,10 +25,7 @@ export class PatController {
   }
 
   @Post()
-  async create(
-    @CurrentUser() user: AuthUser,
-    @Body(new ZodValidationPipe(createPatRequestSchema)) body: CreatePatRequest,
-  ): Promise<PatDto & { token: string }> {
+  async create(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(createPatRequestSchema)) body: CreatePatRequest): Promise<PatDto & { token: string }> {
     const { pat, raw } = await this.auth.createPat(user.userId, body.name);
     // The raw token is returned exactly once.
     return { ...toDto(pat), token: raw };

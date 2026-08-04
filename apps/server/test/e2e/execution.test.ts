@@ -61,15 +61,9 @@ describe('Phase 4 e2e: execution (runs, SSE, recovery)', () => {
     projectId = (project.body as { id: string }).id;
 
     // Agents CRUD arrives in Phase 5; insert registry rows directly.
-    const [agent] = await ds.query(
-      `INSERT INTO agents (owner_id, name, adapter) VALUES ($1, 'FakeAgent', 'fake') RETURNING id`,
-      [userId],
-    );
+    const [agent] = await ds.query(`INSERT INTO agents (owner_id, name, adapter) VALUES ($1, 'FakeAgent', 'fake') RETURNING id`, [userId]);
     agentId = agent.id;
-    const [resumable] = await ds.query(
-      `INSERT INTO agents (owner_id, name, adapter) VALUES ($1, 'ResumableAgent', 'fake-resumable') RETURNING id`,
-      [userId],
-    );
+    const [resumable] = await ds.query(`INSERT INTO agents (owner_id, name, adapter) VALUES ($1, 'ResumableAgent', 'fake-resumable') RETURNING id`, [userId]);
     resumableAgentId = resumable.id;
     cookie = http.cookieHeader()!;
   }, 300_000);
@@ -140,8 +134,9 @@ describe('Phase 4 e2e: execution (runs, SSE, recovery)', () => {
       cookie,
       lastEventId: lastSeenSeq,
       until: (events) =>
-        events.some((e) => (e.data as { type: string }).type === 'orchestrator.status' &&
-          ['succeeded', 'failed'].includes(((e.data as { payload: { status: string } }).payload).status)),
+        events.some(
+          (e) => (e.data as { type: string }).type === 'orchestrator.status' && ['succeeded', 'failed'].includes((e.data as { payload: { status: string } }).payload.status),
+        ),
       timeoutMs: 30_000,
     });
     await approver;
@@ -158,25 +153,13 @@ describe('Phase 4 e2e: execution (runs, SSE, recovery)', () => {
     expect(sorted[0]).toBe(1);
 
     const types = [...firstBatch, ...secondBatch].map((e) => (e.data as { type: string }).type);
-    for (const expected of [
-      'agent.message',
-      'tool.start',
-      'tool.end',
-      'file.change',
-      'usage',
-      'permission.request',
-      'user.approval',
-      'user.message',
-      'result',
-    ]) {
+    for (const expected of ['agent.message', 'tool.start', 'tool.end', 'file.change', 'usage', 'permission.request', 'user.approval', 'user.message', 'result']) {
       expect(types).toContain(expected);
     }
 
     // Steering reached the adapter.
     const fake = worker.registry.get('fake') as FakeAdapter;
-    expect(fake.handles.some((h) => h.received.some((m) => m.text === 'prefer small diffs'))).toBe(
-      true,
-    );
+    expect(fake.handles.some((h) => h.received.some((m) => m.text === 'prefer small diffs'))).toBe(true);
 
     // Usage merged onto the run.
     const run = (await http.get(`/runs/${runId}`)).body as { usage: { tokensIn: number } };

@@ -2,12 +2,7 @@ import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nest
 import type { CreateProjectRequest, UpdateProjectRequest } from '@agentforge/core';
 import { uuidv7 } from '../../../shared/uuidv7';
 import type { Project, ProjectSettings } from '../domain/project';
-import {
-  PROJECT_REPOSITORY,
-  SECRET_REPOSITORY,
-  type ProjectRepository,
-  type SecretRepository,
-} from '../domain/repositories';
+import { PROJECT_REPOSITORY, SECRET_REPOSITORY, type ProjectRepository, type SecretRepository } from '../domain/repositories';
 import { SecretBoxService } from '../../../shared/crypto/secret-box';
 
 @Injectable()

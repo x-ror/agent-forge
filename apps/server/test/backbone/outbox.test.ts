@@ -41,14 +41,8 @@ describe('Phase 3: outbox + BullMQ + reconciliation', () => {
     reconciliation = new ReconciliationService(ds, queues);
 
     const [user] = await ds.query(`INSERT INTO users (email) VALUES ('bb@x.y') RETURNING id`);
-    const [project] = await ds.query(
-      `INSERT INTO projects (owner_id, name, repo_url) VALUES ($1,'p','file:///r') RETURNING id`,
-      [user.id],
-    );
-    const [agent] = await ds.query(
-      `INSERT INTO agents (owner_id, name, adapter) VALUES ($1,'A','api-loop') RETURNING id`,
-      [user.id],
-    );
+    const [project] = await ds.query(`INSERT INTO projects (owner_id, name, repo_url) VALUES ($1,'p','file:///r') RETURNING id`, [user.id]);
+    const [agent] = await ds.query(`INSERT INTO agents (owner_id, name, adapter) VALUES ($1,'A','api-loop') RETURNING id`, [user.id]);
     projectId = project.id;
     agentId = agent.id;
   }, 240_000);
@@ -61,10 +55,7 @@ describe('Phase 3: outbox + BullMQ + reconciliation', () => {
   });
 
   async function insertQueuedRun(): Promise<string> {
-    const [run] = await ds.query(
-      `INSERT INTO runs (project_id, agent_id, task_prompt, base_ref) VALUES ($1,$2,'x','main') RETURNING id`,
-      [projectId, agentId],
-    );
+    const [run] = await ds.query(`INSERT INTO runs (project_id, agent_id, task_prompt, base_ref) VALUES ($1,$2,'x','main') RETURNING id`, [projectId, agentId]);
     return run.id;
   }
 
@@ -75,10 +66,7 @@ describe('Phase 3: outbox + BullMQ + reconciliation', () => {
     const failingRunId = uuidv7();
     await expect(
       ds.transaction(async (em) => {
-        await em.query(
-          `INSERT INTO runs (id, project_id, agent_id, task_prompt, base_ref) VALUES ($1,$2,$3,'x','main')`,
-          [failingRunId, projectId, agentId],
-        );
+        await em.query(`INSERT INTO runs (id, project_id, agent_id, task_prompt, base_ref) VALUES ($1,$2,$3,'x','main')`, [failingRunId, projectId, agentId]);
         await writer.append(em, [
           {
             aggregateType: 'run',
@@ -90,24 +78,13 @@ describe('Phase 3: outbox + BullMQ + reconciliation', () => {
         throw new Error('boom before commit');
       }),
     ).rejects.toThrow('boom');
-    expect(
-      (await ds.query(`SELECT count(*) c FROM runs WHERE id = $1`, [failingRunId]))[0].c,
-    ).toBe('0');
-    expect(
-      (
-        await ds.query(`SELECT count(*) c FROM outbox_events WHERE aggregate_id = $1`, [
-          failingRunId,
-        ])
-      )[0].c,
-    ).toBe('0');
+    expect((await ds.query(`SELECT count(*) c FROM runs WHERE id = $1`, [failingRunId]))[0].c).toBe('0');
+    expect((await ds.query(`SELECT count(*) c FROM outbox_events WHERE aggregate_id = $1`, [failingRunId]))[0].c).toBe('0');
 
     // Successful tx commits both; "crash" = dispatcher simply hasn't run yet.
     const runId = uuidv7();
     await ds.transaction(async (em) => {
-      await em.query(
-        `INSERT INTO runs (id, project_id, agent_id, task_prompt, base_ref) VALUES ($1,$2,$3,'x','main')`,
-        [runId, projectId, agentId],
-      );
+      await em.query(`INSERT INTO runs (id, project_id, agent_id, task_prompt, base_ref) VALUES ($1,$2,$3,'x','main')`, [runId, projectId, agentId]);
       await writer.append(em, [
         {
           aggregateType: 'run',
@@ -118,10 +95,7 @@ describe('Phase 3: outbox + BullMQ + reconciliation', () => {
       ]);
     });
 
-    const pending = await ds.query(
-      `SELECT id FROM outbox_events WHERE aggregate_id = $1 AND dispatched_at IS NULL`,
-      [runId],
-    );
+    const pending = await ds.query(`SELECT id FROM outbox_events WHERE aggregate_id = $1 AND dispatched_at IS NULL`, [runId]);
     expect(pending).toHaveLength(1);
 
     // Dispatcher (post-"restart") turns the surviving row into the job.
@@ -130,10 +104,7 @@ describe('Phase 3: outbox + BullMQ + reconciliation', () => {
     const job = await queues['run.execute'].getJob(`run.execute__${runId}`);
     expect(job).toBeDefined();
     expect(job!.data).toEqual({ runId });
-    const after = await ds.query(
-      `SELECT dispatched_at FROM outbox_events WHERE aggregate_id = $1`,
-      [runId],
-    );
+    const after = await ds.query(`SELECT dispatched_at FROM outbox_events WHERE aggregate_id = $1`, [runId]);
     expect(after[0].dispatched_at).not.toBeNull();
   });
 

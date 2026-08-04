@@ -27,9 +27,7 @@ export class TypeormProjectRepository implements ProjectRepository {
   }
 
   async listByOwner(ownerId: string): Promise<Project[]> {
-    const rows = await this.ds
-      .getRepository(ProjectEntity)
-      .find({ where: { ownerId }, order: { id: 'ASC' } });
+    const rows = await this.ds.getRepository(ProjectEntity).find({ where: { ownerId }, order: { id: 'ASC' } });
     return rows.map(toDomain);
   }
 
@@ -43,9 +41,7 @@ export class TypeormSecretRepository implements SecretRepository {
   constructor(@Inject(DATA_SOURCE) private readonly ds: DataSource) {}
 
   async upsert(secret: Secret): Promise<void> {
-    await this.ds
-      .getRepository(SecretEntity)
-      .upsert({ ...secret }, { conflictPaths: ['projectId', 'key'] });
+    await this.ds.getRepository(SecretEntity).upsert({ ...secret }, { conflictPaths: ['projectId', 'key'] });
   }
 
   async find(projectId: string, key: string): Promise<Secret | null> {

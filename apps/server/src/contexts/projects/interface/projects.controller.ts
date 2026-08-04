@@ -1,15 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Patch,
-  Post,
-  Put,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put } from '@nestjs/common';
 import {
   createProjectRequestSchema,
   putSecretRequestSchema,
@@ -46,10 +35,7 @@ export class ProjectsController {
   }
 
   @Post()
-  async create(
-    @CurrentUser() user: AuthUser,
-    @Body(new ZodValidationPipe(createProjectRequestSchema)) body: CreateProjectRequest,
-  ): Promise<ProjectDto> {
+  async create(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(createProjectRequestSchema)) body: CreateProjectRequest): Promise<ProjectDto> {
     return toDto(await this.projects.create(user.userId, body));
   }
 
@@ -59,11 +45,7 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  async update(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(updateProjectRequestSchema)) body: UpdateProjectRequest,
-  ): Promise<ProjectDto> {
+  async update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodValidationPipe(updateProjectRequestSchema)) body: UpdateProjectRequest): Promise<ProjectDto> {
     return toDto(await this.projects.update(user.userId, id, body));
   }
 
@@ -76,10 +58,7 @@ export class ProjectsController {
   // ---- Secrets: write-only -------------------------------------------------
 
   @Get(':id/secrets')
-  async listSecretKeys(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-  ): Promise<{ keys: string[] }> {
+  async listSecretKeys(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<{ keys: string[] }> {
     return { keys: await this.projects.listSecretKeys(user.userId, id) };
   }
 
@@ -99,11 +78,7 @@ export class ProjectsController {
 
   @Delete(':id/secrets/:key')
   @HttpCode(204)
-  async deleteSecret(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Param('key') key: string,
-  ): Promise<void> {
+  async deleteSecret(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('key') key: string): Promise<void> {
     await this.projects.deleteSecret(user.userId, id, key);
   }
 }

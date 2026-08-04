@@ -1,11 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
-import {
-  createAgentRequestSchema,
-  updateAgentRequestSchema,
-  type AgentDto,
-  type CreateAgentRequest,
-  type UpdateAgentRequest,
-} from '@agentforge/core';
+import { createAgentRequestSchema, updateAgentRequestSchema, type AgentDto, type CreateAgentRequest, type UpdateAgentRequest } from '@agentforge/core';
 import { CurrentUser, type AuthUser } from '../../../shared/http/auth.decorators';
 import { ZodValidationPipe } from '../../../shared/http/zod-validation.pipe';
 import type { Agent } from '../domain/agent';
@@ -32,10 +26,7 @@ export class AgentsController {
   }
 
   @Post()
-  async create(
-    @CurrentUser() user: AuthUser,
-    @Body(new ZodValidationPipe(createAgentRequestSchema)) body: CreateAgentRequest,
-  ): Promise<AgentDto> {
+  async create(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(createAgentRequestSchema)) body: CreateAgentRequest): Promise<AgentDto> {
     return toDto(await this.agents.create(user.userId, body));
   }
 
@@ -45,11 +36,7 @@ export class AgentsController {
   }
 
   @Patch(':id')
-  async update(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body(new ZodValidationPipe(updateAgentRequestSchema)) body: UpdateAgentRequest,
-  ): Promise<AgentDto> {
+  async update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body(new ZodValidationPipe(updateAgentRequestSchema)) body: UpdateAgentRequest): Promise<AgentDto> {
     return toDto(await this.agents.update(user.userId, id, body));
   }
 

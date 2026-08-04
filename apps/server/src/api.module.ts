@@ -13,18 +13,7 @@ import { QueueModule } from './shared/queue/queue.module';
 import { RedisModule } from './shared/redis/redis.module';
 
 @Module({
-  imports: [
-    EnvModule,
-    DatabaseModule,
-    RedisModule,
-    QueueModule,
-    OutboxModule,
-    IdentityModule,
-    ProjectsModule,
-    AgentRegistryModule,
-    ExecutionModule,
-    TaskingModule,
-  ],
+  imports: [EnvModule, DatabaseModule, RedisModule, QueueModule, OutboxModule, IdentityModule, ProjectsModule, AgentRegistryModule, ExecutionModule, TaskingModule],
   controllers: [HealthController, OpenApiController],
 })
 export class ApiModule {}

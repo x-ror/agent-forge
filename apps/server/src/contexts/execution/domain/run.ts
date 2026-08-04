@@ -1,24 +1,9 @@
 import type { Json } from '@agentforge/core';
 
-export const RUN_STATUSES = [
-  'queued',
-  'provisioning',
-  'running',
-  'awaiting_input',
-  'finalizing',
-  'succeeded',
-  'failed',
-  'cancelled',
-] as const;
+export const RUN_STATUSES = ['queued', 'provisioning', 'running', 'awaiting_input', 'finalizing', 'succeeded', 'failed', 'cancelled'] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
-export const ACTIVE_RUN_STATUSES: readonly RunStatus[] = [
-  'queued',
-  'provisioning',
-  'running',
-  'awaiting_input',
-  'finalizing',
-];
+export const ACTIVE_RUN_STATUSES: readonly RunStatus[] = ['queued', 'provisioning', 'running', 'awaiting_input', 'finalizing'];
 
 /** §3.1: queued → provisioning → running ⇄ awaiting_input → finalizing → succeeded | failed | cancelled */
 const TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
@@ -63,6 +48,8 @@ export interface RunProps {
   leaseAt: Date | null;
   workspacePath: string | null;
   resumeState: Json | null;
+  /** Structured-output spec for decision runs: { routes: string[] } (§6.1). */
+  structured: Json | null;
   createdAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
@@ -71,13 +58,7 @@ export interface RunProps {
 export class Run {
   private constructor(private readonly props: RunProps) {}
 
-  static create(input: {
-    id: string;
-    projectId: string;
-    agentId: string;
-    taskPrompt: string;
-    baseRef: string;
-  }): Run {
+  static create(input: { id: string; projectId: string; agentId: string; taskPrompt: string; baseRef: string }): Run {
     return new Run({
       ...input,
       status: 'queued',
@@ -87,6 +68,7 @@ export class Run {
       leaseAt: null,
       workspacePath: null,
       resumeState: null,
+      structured: null,
       createdAt: new Date(),
       startedAt: null,
       finishedAt: null,
@@ -132,6 +114,9 @@ export class Run {
   }
   get resumeState(): Json | null {
     return this.props.resumeState;
+  }
+  get structured(): Json | null {
+    return this.props.structured;
   }
   get createdAt(): Date {
     return this.props.createdAt;

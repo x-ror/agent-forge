@@ -1,13 +1,4 @@
-import {
-  Content,
-  Header,
-  HeaderMenuButton,
-  HeaderName,
-  SideNav,
-  SideNavItems,
-  SideNavLink,
-  Theme,
-} from '@carbon/react';
+import { Content, Header, HeaderMenuButton, HeaderName, SideNav, SideNavItems, SideNavLink, Theme } from '@carbon/react';
 import { useState } from 'react';
 
 export default function App() {
@@ -16,11 +7,7 @@ export default function App() {
   return (
     <Theme theme="g100">
       <Header aria-label="AgentForge">
-        <HeaderMenuButton
-          aria-label={sideNavExpanded ? 'Close menu' : 'Open menu'}
-          onClick={() => setSideNavExpanded(!sideNavExpanded)}
-          isActive={sideNavExpanded}
-        />
+        <HeaderMenuButton aria-label={sideNavExpanded ? 'Close menu' : 'Open menu'} onClick={() => setSideNavExpanded(!sideNavExpanded)} isActive={sideNavExpanded} />
         <HeaderName href="/" prefix="">
           AgentForge
         </HeaderName>

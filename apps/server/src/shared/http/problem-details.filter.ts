@@ -1,10 +1,4 @@
-import {
-  Catch,
-  HttpException,
-  HttpStatus,
-  type ArgumentsHost,
-  type ExceptionFilter,
-} from '@nestjs/common';
+import { Catch, HttpException, HttpStatus, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
 import type { Response } from 'express';
 
 interface ValidationErrorItem {
@@ -30,12 +24,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
         title = body;
       } else if (typeof body === 'object' && body !== null) {
         const rec = body as Record<string, unknown>;
-        title =
-          typeof rec.error === 'string'
-            ? rec.error
-            : typeof rec.message === 'string'
-              ? rec.message
-              : exception.message;
+        title = typeof rec.error === 'string' ? rec.error : typeof rec.message === 'string' ? rec.message : exception.message;
         if (typeof rec.message === 'string' && typeof rec.error === 'string') {
           detail = rec.message;
         }

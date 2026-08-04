@@ -1,19 +1,7 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { CreateAgentRequest, UpdateAgentRequest } from '@agentforge/core';
 import { uuidv7 } from '../../../shared/uuidv7';
-import {
-  AGENT_REPOSITORY,
-  type Agent,
-  type AgentConfig,
-  type AgentRepository,
-  type AdapterId,
-} from '../domain/agent';
+import { AGENT_REPOSITORY, type Agent, type AgentConfig, type AgentRepository, type AdapterId } from '../domain/agent';
 import { AdapterRegistry } from './adapter-registry';
 
 @Injectable()

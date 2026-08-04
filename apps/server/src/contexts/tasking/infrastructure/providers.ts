@@ -4,11 +4,7 @@ import { parseGithubRepo } from '../../scm/domain/scm';
 import { GIT_PORT, type GitPort } from '../../scm/domain/ports';
 import { ScmService } from '../../scm/application/scm.service';
 import type { TaskSource } from '../domain/task';
-import type {
-  ExternalTask,
-  TaskSourceProvider,
-  TaskSourceProviderContext,
-} from '../domain/ports';
+import type { ExternalTask, TaskSourceProvider, TaskSourceProviderContext } from '../domain/ports';
 
 /** GitHub Issues → tasks. Config: { repo?: 'owner/name', labels?: string[] }. */
 @Injectable()
@@ -17,29 +13,22 @@ export class GithubIssuesProvider implements TaskSourceProvider {
 
   async fetch(source: TaskSource, ctx: TaskSourceProviderContext): Promise<ExternalTask[]> {
     const config = source.config as { repo?: string; labels?: string[] };
-    const parsed = config.repo
-      ? { owner: config.repo.split('/')[0]!, repo: config.repo.split('/')[1]! }
-      : parseGithubRepo(ctx.projectRepoUrl);
+    const parsed = config.repo ? { owner: config.repo.split('/')[0]!, repo: config.repo.split('/')[1]! } : parseGithubRepo(ctx.projectRepoUrl);
     if (!parsed) {
       throw new Error('github_issues source: cannot determine owner/repo (set config.repo)');
     }
     const token = ctx.env.GITHUB_TOKEN ?? ctx.env.GH_TOKEN;
-    const apiBase = (
-      (ctx.projectSettings.githubApiUrl as string | undefined) ?? 'https://api.github.com'
-    ).replace(/\/$/, '');
+    const apiBase = ((ctx.projectSettings.githubApiUrl as string | undefined) ?? 'https://api.github.com').replace(/\/$/, '');
 
     const params = new URLSearchParams({ state: 'open', per_page: '100' });
     if (config.labels?.length) params.set('labels', config.labels.join(','));
-    const res = await fetch(
-      `${apiBase}/repos/${parsed.owner}/${parsed.repo}/issues?${params.toString()}`,
-      {
-        headers: {
-          accept: 'application/vnd.github+json',
-          'user-agent': 'agentforge',
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-        },
+    const res = await fetch(`${apiBase}/repos/${parsed.owner}/${parsed.repo}/issues?${params.toString()}`, {
+      headers: {
+        accept: 'application/vnd.github+json',
+        'user-agent': 'agentforge',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
-    );
+    });
     if (!res.ok) {
       throw new Error(`github issues fetch failed: ${res.status} ${await res.text()}`);
     }
@@ -83,12 +72,7 @@ export class FileTasksProvider implements TaskSourceProvider {
     const config = source.config as { path?: string; ref?: string };
     const filePath = config.path ?? 'TASKS.md';
     const mirror = this.scm.mirrorPath(ctx.projectId);
-    const { stdout } = await this.git.run([
-      '-C',
-      mirror,
-      'show',
-      `${config.ref ?? 'HEAD'}:${filePath}`,
-    ]);
+    const { stdout } = await this.git.run(['-C', mirror, 'show', `${config.ref ?? 'HEAD'}:${filePath}`]);
 
     const tasks: ExternalTask[] = [];
     for (const line of stdout.split('\n')) {

@@ -1,13 +1,6 @@
 import path from 'node:path';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import {
-  agentEventSchema,
-  type AgentAdapter,
-  type AgentHandle,
-  type AgentEvent,
-  type Json,
-  type RunContext,
-} from '@agentforge/core';
+import { agentEventSchema, type AgentAdapter, type AgentHandle, type AgentEvent, type Json, type RunContext } from '@agentforge/core';
 import { APP_ENV, type AppEnv } from '../../../config/env';
 import { EventTypes, type IntegrationEvent } from '../../../shared/outbox/integration-event';
 import { AdapterRegistry } from '../../agent-registry/application/adapter-registry';
@@ -16,12 +9,7 @@ import { AGENT_REPOSITORY, type AgentRepository } from '../../agent-registry/dom
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../projects/domain/repositories';
 import { SecretProvisioningService } from '../../projects/application/projects.service';
 import { Run } from '../domain/run';
-import {
-  RUN_INPUT_REPOSITORY,
-  RUN_REPOSITORY,
-  type RunInputRepository,
-  type RunRepository,
-} from '../domain/repositories';
+import { RUN_INPUT_REPOSITORY, RUN_REPOSITORY, type RunInputRepository, type RunRepository } from '../domain/repositories';
 import { SANDBOX_DRIVER, type Sandbox, type SandboxDriver } from '../domain/sandbox';
 import { RUN_TX, type RunTxPort } from '../domain/ports';
 
@@ -29,6 +17,14 @@ const LEASE_STALE_MS = 90_000;
 const HEARTBEAT_MS = 15_000;
 const INPUT_POLL_MS = 700;
 const DEFAULT_RUN_TIMEOUT_MS = 2 * 3600_000;
+
+function runStructured(run: Run): { routes: string[] } | undefined {
+  const value = run.structured;
+  if (value !== null && typeof value === 'object' && 'routes' in value && Array.isArray((value as { routes: unknown }).routes)) {
+    return { routes: (value as { routes: unknown[] }).routes.map(String) };
+  }
+  return undefined;
+}
 
 interface PumpOutcome {
   cancelled: boolean;
@@ -72,9 +68,7 @@ export class RunOrchestrator {
 
   private async runFresh(run: Run): Promise<void> {
     run.startProvisioning();
-    await this.tx.saveRunAndEvents(run, [
-      { type: 'orchestrator.status', payload: { status: 'provisioning' } },
-    ]);
+    await this.tx.saveRunAndEvents(run, [{ type: 'orchestrator.status', payload: { status: 'provisioning' } }]);
     await this.provisionAndPump(run, (adapter, ctx) => adapter.start(ctx));
   }
 
@@ -87,9 +81,7 @@ export class RunOrchestrator {
     const adapter = agent ? this.registry.get(agent.adapter) : undefined;
 
     if (adapter?.capabilities.resume && adapter.resume && run.resumeState !== null) {
-      await this.tx.saveRunAndEvents(run, [
-        { type: 'orchestrator.resumed', payload: { reason: 'stale_lease' } },
-      ]);
+      await this.tx.saveRunAndEvents(run, [{ type: 'orchestrator.resumed', payload: { reason: 'stale_lease' } }]);
       await this.provisionAndPump(run, (a, ctx) => a.resume!(ctx, { data: run.resumeState! }), {
         resuming: true,
       });
@@ -99,18 +91,10 @@ export class RunOrchestrator {
     // Honest failure: no resume path — preserve worktree + history (§5.4).
     const flowRunId = await this.tx.flowRunIdFor(run.id);
     run.fail('recovered after worker crash (adapter cannot resume)');
-    await this.tx.saveRunAndEvents(
-      run,
-      [{ type: 'orchestrator.crash_recovered', payload: { resumable: false } }],
-      [this.terminalEvent(run, EventTypes.RunFailed, flowRunId)],
-    );
+    await this.tx.saveRunAndEvents(run, [{ type: 'orchestrator.crash_recovered', payload: { resumable: false } }], [this.terminalEvent(run, EventTypes.RunFailed, flowRunId)]);
   }
 
-  private async provisionAndPump(
-    run: Run,
-    begin: (adapter: AgentAdapter, ctx: RunContext) => Promise<AgentHandle>,
-    opts: { resuming?: boolean } = {},
-  ): Promise<void> {
+  private async provisionAndPump(run: Run, begin: (adapter: AgentAdapter, ctx: RunContext) => Promise<AgentHandle>, opts: { resuming?: boolean } = {}): Promise<void> {
     let sandbox: Sandbox | undefined;
     try {
       const agent = await this.agents.findById(run.agentId);
@@ -168,15 +152,14 @@ export class RunOrchestrator {
         },
         env,
         sandbox,
+        ...(runStructured(run) ? { structured: runStructured(run)! } : {}),
       };
 
       const handle = await begin(adapter, ctx);
 
       if (!opts.resuming) {
         run.markRunning();
-        await this.tx.saveRunAndEvents(run, [
-          { type: 'orchestrator.status', payload: { status: 'running' } },
-        ]);
+        await this.tx.saveRunAndEvents(run, [{ type: 'orchestrator.status', payload: { status: 'running' } }]);
       }
 
       const outcome = await this.pump(run, handle);
@@ -217,9 +200,7 @@ export class RunOrchestrator {
           try {
             if (input.kind === 'message' && payload.text) {
               await handle.send({ text: payload.text });
-              await this.tx.saveRunAndEvents(run, [
-                { type: 'user.message', payload: { text: payload.text } },
-              ]);
+              await this.tx.saveRunAndEvents(run, [{ type: 'user.message', payload: { text: payload.text } }]);
             } else if (input.kind === 'approval' && payload.permissionId && payload.decision) {
               await handle.respondToPermission(payload.permissionId, payload.decision, payload.note);
               if (run.status === 'awaiting_input') run.resumeRunning();
@@ -232,9 +213,7 @@ export class RunOrchestrator {
             } else if (input.kind === 'cancel') {
               outcome.cancelled = true;
               stopping = true;
-              await this.tx.saveRunAndEvents(run, [
-                { type: 'user.cancel', payload: { reason: payload.reason ?? null } },
-              ]);
+              await this.tx.saveRunAndEvents(run, [{ type: 'user.cancel', payload: { reason: payload.reason ?? null } }]);
               await handle.stop('cancelled');
             }
           } catch (error) {
@@ -249,9 +228,7 @@ export class RunOrchestrator {
       for await (const raw of handle.events) {
         const parsed = agentEventSchema.safeParse(raw);
         if (!parsed.success) {
-          await this.tx.saveRunAndEvents(run, [
-            { type: 'raw', payload: { raw: raw as unknown as Json } },
-          ]);
+          await this.tx.saveRunAndEvents(run, [{ type: 'raw', payload: { raw: raw as unknown as Json } }]);
           continue;
         }
         const event: AgentEvent = parsed.data;
@@ -293,9 +270,7 @@ export class RunOrchestrator {
 
         const resumeState = handle.getResumeState?.() ?? run.resumeState;
         run.setResumeState(resumeState ?? null);
-        await this.tx.saveRunAndEvents(run, [
-          { type: event.type, payload: event as unknown as Json },
-        ]);
+        await this.tx.saveRunAndEvents(run, [{ type: event.type, payload: event as unknown as Json }]);
 
         if (stopping) break;
       }
@@ -312,11 +287,7 @@ export class RunOrchestrator {
 
     if (outcome.cancelled) {
       run.cancel();
-      await this.tx.saveRunAndEvents(
-        run,
-        [{ type: 'orchestrator.status', payload: { status: 'cancelled' } }],
-        [this.terminalEvent(run, EventTypes.RunCancelled, flowRunId)],
-      );
+      await this.tx.saveRunAndEvents(run, [{ type: 'orchestrator.status', payload: { status: 'cancelled' } }], [this.terminalEvent(run, EventTypes.RunCancelled, flowRunId)]);
       return;
     }
     if (outcome.fatalError !== null || outcome.result === null) {
@@ -330,9 +301,7 @@ export class RunOrchestrator {
     }
 
     run.beginFinalizing();
-    await this.tx.saveRunAndEvents(run, [
-      { type: 'orchestrator.status', payload: { status: 'finalizing' } },
-    ]);
+    await this.tx.saveRunAndEvents(run, [{ type: 'orchestrator.status', payload: { status: 'finalizing' } }]);
     // Snapshot agent work as a commit + cumulative diff artifact (§8).
     try {
       await this.scm.finalizeRunWorkspace(run.snapshot());
@@ -357,12 +326,7 @@ export class RunOrchestrator {
     }
   }
 
-  private terminalEvent(
-    run: Run,
-    eventType: string,
-    flowRunId: string | null,
-    result?: { summary: string; structured?: Json },
-  ): IntegrationEvent {
+  private terminalEvent(run: Run, eventType: string, flowRunId: string | null, result?: { summary: string; structured?: Json }): IntegrationEvent {
     return {
       aggregateType: 'run',
       aggregateId: run.id,
@@ -381,11 +345,7 @@ export class RunOrchestrator {
     try {
       const flowRunId = await this.tx.flowRunIdFor(run.id);
       if (!run.isTerminal) run.fail(error);
-      await this.tx.saveRunAndEvents(
-        run,
-        [{ type: 'orchestrator.status', payload: { status: 'failed', error } }],
-        [this.terminalEvent(run, EventTypes.RunFailed, flowRunId)],
-      );
+      await this.tx.saveRunAndEvents(run, [{ type: 'orchestrator.status', payload: { status: 'failed', error } }], [this.terminalEvent(run, EventTypes.RunFailed, flowRunId)]);
     } catch (persistError) {
       this.logger.error(`could not persist failure for run ${run.id}: ${String(persistError)}`);
     }

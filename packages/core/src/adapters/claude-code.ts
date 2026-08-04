@@ -1,14 +1,5 @@
 import type { Json } from '../json';
-import type {
-  AgentAdapter,
-  AgentHandle,
-  AdapterCapabilities,
-  ResumeState,
-  RunContext,
-  SandboxProcess,
-  StopReason,
-  UserMessage,
-} from '../protocol/adapter';
+import type { AgentAdapter, AgentHandle, AdapterCapabilities, ResumeState, RunContext, SandboxProcess, StopReason, UserMessage } from '../protocol/adapter';
 import { EventChannel, lines } from './util';
 
 /**
@@ -99,10 +90,7 @@ class ClaudeCodeHandle implements AgentHandle {
       response: {
         request_id: id,
         subtype: 'success',
-        response:
-          decision === 'allow'
-            ? { behavior: 'allow', updatedInput: input ?? {} }
-            : { behavior: 'deny', message: note ?? 'denied by user' },
+        response: decision === 'allow' ? { behavior: 'allow', updatedInput: input ?? {} } : { behavior: 'deny', message: note ?? 'denied by user' },
       },
     });
   }
@@ -175,8 +163,7 @@ class ClaudeCodeHandle implements AgentHandle {
         for (const block of event.message?.content ?? []) {
           if (block.type === 'tool_result' && block.tool_use_id) {
             const tool = this.toolNames.get(block.tool_use_id) ?? 'unknown';
-            const output =
-              typeof block.content === 'string' ? block.content : JSON.stringify(block.content ?? '');
+            const output = typeof block.content === 'string' ? block.content : JSON.stringify(block.content ?? '');
             this.channel.push({
               type: 'tool.end',
               tool,
@@ -239,10 +226,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
   }
 
   async resume(ctx: RunContext, state: ResumeState): Promise<AgentHandle> {
-    const sessionId =
-      typeof state.data === 'object' && state.data !== null && 'sessionId' in state.data
-        ? String((state.data as { sessionId: unknown }).sessionId)
-        : null;
+    const sessionId = typeof state.data === 'object' && state.data !== null && 'sessionId' in state.data ? String((state.data as { sessionId: unknown }).sessionId) : null;
     return this.launch(ctx, sessionId);
   }
 
@@ -252,9 +236,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     // --version handshake: incompatible/missing CLI fails at start (§6.3).
     const version = await ctx.sandbox.exec([options.cliPath, '--version'], { timeoutMs: 30_000 });
     if (version.exitCode !== 0) {
-      throw new Error(
-        `claude-code: '${options.cliPath} --version' failed (exit ${version.exitCode}): ${version.stderr}`,
-      );
+      throw new Error(`claude-code: '${options.cliPath} --version' failed (exit ${version.exitCode}): ${version.stderr}`);
     }
 
     const args = [

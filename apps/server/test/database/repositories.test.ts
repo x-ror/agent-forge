@@ -1,31 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DataSource } from 'typeorm';
 import { TypeormAgentRepository } from '../../src/contexts/agent-registry/infrastructure/typeorm-repositories';
-import {
-  TypeormPersonalAccessTokenRepository,
-  TypeormSessionRepository,
-  TypeormUserRepository,
-} from '../../src/contexts/identity/infrastructure/typeorm-repositories';
+import { TypeormPersonalAccessTokenRepository, TypeormSessionRepository, TypeormUserRepository } from '../../src/contexts/identity/infrastructure/typeorm-repositories';
 import { Run } from '../../src/contexts/execution/domain/run';
-import {
-  TypeormRunEventRepository,
-  TypeormRunInputRepository,
-  TypeormRunRepository,
-} from '../../src/contexts/execution/infrastructure/typeorm-repositories';
+import { TypeormRunEventRepository, TypeormRunInputRepository, TypeormRunRepository } from '../../src/contexts/execution/infrastructure/typeorm-repositories';
 import { FlowRun } from '../../src/contexts/orchestration/domain/flow-run';
-import {
-  TypeormFlowRunRepository,
-  TypeormFlowStepRepository,
-  TypeormWorkflowRepository,
-} from '../../src/contexts/orchestration/infrastructure/typeorm-repositories';
-import {
-  TypeormProjectRepository,
-  TypeormSecretRepository,
-} from '../../src/contexts/projects/infrastructure/typeorm-repositories';
-import {
-  TypeormTaskRepository,
-  TypeormTaskSourceRepository,
-} from '../../src/contexts/tasking/infrastructure/typeorm-repositories';
+import { TypeormFlowRunRepository, TypeormFlowStepRepository, TypeormWorkflowRepository } from '../../src/contexts/orchestration/infrastructure/typeorm-repositories';
+import { TypeormProjectRepository, TypeormSecretRepository } from '../../src/contexts/projects/infrastructure/typeorm-repositories';
+import { TypeormTaskRepository, TypeormTaskSourceRepository } from '../../src/contexts/tasking/infrastructure/typeorm-repositories';
 import { uuidv7 } from '../../src/shared/uuidv7';
 import { connectApp, startMigratedPg, type PgTestContext } from '../helpers/pg';
 
@@ -285,7 +267,7 @@ describe('repository round-trips', () => {
       runId: null,
       decision: null,
       startedAt: new Date(),
-    finishedAt: null,
+      finishedAt: null,
     });
     await steps.updateStatus(stepId, 'succeeded', {
       decision: { route: 'deep', reasoning: 'touches auth' },

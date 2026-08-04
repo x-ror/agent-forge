@@ -8,7 +8,11 @@ import { z } from 'zod';
  */
 
 const nodeId = z.string().min(1).max(64);
-const routeName = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
+const routeName = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/);
 
 export const workflowNodeSchema = z.discriminatedUnion('type', [
   z.object({ id: nodeId, type: z.literal('trigger.task_selected') }),
@@ -60,10 +64,7 @@ export type WorkflowNodeType = WorkflowNode['type'];
 
 export const edgeConditionSchema = z
   .string()
-  .regex(
-    /^(succeeded|failed|approved|rejected|route:[A-Za-z0-9_-]+)$/,
-    'edge condition must be succeeded | failed | approved | rejected | route:<name>',
-  );
+  .regex(/^(succeeded|failed|approved|rejected|route:[A-Za-z0-9_-]+)$/, 'edge condition must be succeeded | failed | approved | rejected | route:<name>');
 
 export const workflowEdgeSchema = z.object({
   from: nodeId,
@@ -175,9 +176,7 @@ export function validateWorkflowGraph(def: WorkflowDefinition): WorkflowGraphIss
   for (const node of def.nodes) {
     if (node.type !== 'decision.agent' && node.type !== 'decision.rule') continue;
     const declared = new Set(node.routes);
-    const outgoingRoutes = def.edges
-      .filter((e) => e.from === node.id && e.on.startsWith('route:'))
-      .map((e) => e.on.slice('route:'.length));
+    const outgoingRoutes = def.edges.filter((e) => e.from === node.id && e.on.startsWith('route:')).map((e) => e.on.slice('route:'.length));
     for (const r of outgoingRoutes) {
       if (!declared.has(r)) {
         issues.push({

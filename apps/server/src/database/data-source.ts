@@ -1,26 +1,13 @@
 import { DataSource } from 'typeorm';
 import { AgentEntity } from '../contexts/agent-registry/infrastructure/entities';
-import {
-  PersonalAccessTokenEntity,
-  SessionEntity,
-  UserEntity,
-} from '../contexts/identity/infrastructure/entities';
-import {
-  ArtifactEntity,
-  RunEntity,
-  RunEventEntity,
-  RunInputEntity,
-} from '../contexts/execution/infrastructure/entities';
-import {
-  FlowRunEntity,
-  FlowStepEntity,
-  ScheduleEntity,
-  WorkflowEntity,
-} from '../contexts/orchestration/infrastructure/entities';
+import { PersonalAccessTokenEntity, SessionEntity, UserEntity } from '../contexts/identity/infrastructure/entities';
+import { ArtifactEntity, RunEntity, RunEventEntity, RunInputEntity } from '../contexts/execution/infrastructure/entities';
+import { FlowRunEntity, FlowStepEntity, ScheduleEntity, WorkflowEntity } from '../contexts/orchestration/infrastructure/entities';
 import { ProjectEntity, SecretEntity } from '../contexts/projects/infrastructure/entities';
 import { TaskEntity, TaskSourceEntity } from '../contexts/tasking/infrastructure/entities';
 import { OutboxEventEntity } from '../shared/outbox/outbox-event.entity';
 import { InitialSchema1754300000001 } from './migrations/1754300000001-initial-schema';
+import { FlowEngine1754300000002 } from './migrations/1754300000002-flow-engine';
 import { SnakeNamingStrategy } from './naming-strategy';
 
 export const ALL_ENTITIES = [
@@ -43,7 +30,7 @@ export const ALL_ENTITIES = [
   OutboxEventEntity,
 ];
 
-export const ALL_MIGRATIONS = [InitialSchema1754300000001];
+export const ALL_MIGRATIONS = [InitialSchema1754300000001, FlowEngine1754300000002];
 
 /** Runtime connection — restricted app role. */
 export function createAppDataSource(url: string): DataSource {

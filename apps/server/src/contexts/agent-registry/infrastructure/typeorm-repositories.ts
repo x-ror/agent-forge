@@ -31,9 +31,7 @@ export class TypeormAgentRepository implements AgentRepository {
   }
 
   async listByOwner(ownerId: string): Promise<Agent[]> {
-    const rows = await this.ds
-      .getRepository(AgentEntity)
-      .find({ where: { ownerId }, order: { name: 'ASC' } });
+    const rows = await this.ds.getRepository(AgentEntity).find({ where: { ownerId }, order: { name: 'ASC' } });
     return rows.map(toDomain);
   }
 

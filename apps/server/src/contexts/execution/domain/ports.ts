@@ -11,11 +11,7 @@ import type { RunEvent, RunInput } from './run-event';
 export interface RunTxPort {
   insertRun(run: Run, integrationEvents: IntegrationEvent[]): Promise<void>;
   insertInput(input: RunInput, integrationEvents: IntegrationEvent[]): Promise<void>;
-  saveRunAndEvents(
-    run: Run,
-    events: Array<{ type: string; payload: Json }>,
-    integrationEvents?: IntegrationEvent[],
-  ): Promise<RunEvent[]>;
+  saveRunAndEvents(run: Run, events: Array<{ type: string; payload: Json }>, integrationEvents?: IntegrationEvent[]): Promise<RunEvent[]>;
   /** Which flow run (if any) owns this run — used to tick the engine. */
   flowRunIdFor(runId: string): Promise<string | null>;
 }

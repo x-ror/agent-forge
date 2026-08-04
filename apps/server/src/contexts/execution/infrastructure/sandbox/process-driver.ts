@@ -2,11 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable } from '@nestjs/common';
-import type {
-  SandboxExecOptions,
-  SandboxExecResult,
-  SandboxProcess,
-} from '@agentforge/core';
+import type { SandboxExecOptions, SandboxExecResult, SandboxProcess } from '@agentforge/core';
 import type { Sandbox, SandboxDriver, SandboxOptions } from '../../domain/sandbox';
 
 /** Wraps a node child process as a streaming SandboxProcess. */

@@ -5,20 +5,11 @@ import { AdapterRegistry } from '../../src/contexts/agent-registry/application/a
 import { TypeormAgentRepository } from '../../src/contexts/agent-registry/infrastructure/typeorm-repositories';
 import { RunOrchestrator } from '../../src/contexts/execution/application/run-orchestrator';
 import { RunTxOps } from '../../src/contexts/execution/infrastructure/run-tx-ops';
-import {
-  TypeormRunEventRepository,
-  TypeormRunInputRepository,
-  TypeormRunRepository,
-} from '../../src/contexts/execution/infrastructure/typeorm-repositories';
+import { TypeormRunEventRepository, TypeormRunInputRepository, TypeormRunRepository } from '../../src/contexts/execution/infrastructure/typeorm-repositories';
 import { ProcessSandboxDriver } from '../../src/contexts/execution/infrastructure/sandbox/process-driver';
-import {
-  SecretProvisioningService,
-} from '../../src/contexts/projects/application/projects.service';
+import { SecretProvisioningService } from '../../src/contexts/projects/application/projects.service';
 import { SecretBox, type SecretBoxService } from '../../src/shared/crypto/secret-box';
-import {
-  TypeormProjectRepository,
-  TypeormSecretRepository,
-} from '../../src/contexts/projects/infrastructure/typeorm-repositories';
+import { TypeormProjectRepository, TypeormSecretRepository } from '../../src/contexts/projects/infrastructure/typeorm-repositories';
 import { loadEnv, type AppEnv } from '../../src/config/env';
 import { UnitOfWork } from '../../src/database/unit-of-work';
 import { OutboxDispatcher } from '../../src/shared/outbox/outbox-dispatcher.service';
@@ -44,12 +35,7 @@ export interface TestWorker {
 }
 
 /** Assembles the worker side (orchestrator + dispatcher + BullMQ consumer) for e2e tests. */
-export function buildTestWorker(
-  ds: DataSource,
-  redisUrl: string,
-  redisClient: Redis,
-  envOverrides: Partial<AppEnv> = {},
-): TestWorker {
+export function buildTestWorker(ds: DataSource, redisUrl: string, redisClient: Redis, envOverrides: Partial<AppEnv> = {}): TestWorker {
   const env: AppEnv = { ...loadEnv(), ...envOverrides };
 
   const queues = {} as Record<QueueName, Queue>;
@@ -66,18 +52,9 @@ export function buildTestWorker(
   const outboxWriter = new OutboxWriter();
   const txOps = new RunTxOps(uow, outboxWriter);
   const secretBox = new SecretBox(env.AGENTFORGE_SECRET_KEY) as SecretBoxService;
-  const secretProvisioning = new SecretProvisioningService(
-    new TypeormSecretRepository(ds),
-    secretBox,
-  );
+  const secretProvisioning = new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox);
 
-  const scm = new ScmService(
-    env,
-    new TypeormArtifactRepository(ds),
-    new GitCli(),
-    new GithubClient(),
-    secretProvisioning,
-  );
+  const scm = new ScmService(env, new TypeormArtifactRepository(ds), new GitCli(), new GithubClient(), secretProvisioning);
 
   const orchestrator = new RunOrchestrator(
     new TypeormRunRepository(ds),
