@@ -51,3 +51,25 @@ Running log per implementation-cycle prompt. Newest phase last.
 - **Extra `runs` columns** beyond §4: `workspace_path` (standalone-run worktree) and `resume_state` (adapter §6.1 `ResumeState` persisted by the orchestrator) — both needed by Phases 4–5; added now to avoid a churn migration.
 - **Re-sync never overwrites task status** — `upsertSynced` updates title/body/meta only; board lifecycle is locally owned.
 - jsonb entity columns are typed `unknown` at the persistence layer (TypeORM's DeepPartial recursion breaks on recursive `Json`); typed casts live in the repository mappers, which is where translation belongs anyway.
+
+---
+
+## Phase 2 — Identity & Projects (done)
+
+**Built:**
+
+- Local auth: register/login/logout with argon2id password hashing; opaque session tokens (random 32 bytes) stored SHA-256-hashed in `sessions`, HttpOnly SameSite=Lax cookie, 30-day TTL, throttled `last_seen_at` touch.
+- PATs: `agf_pat_…` tokens returned exactly once, SHA-256-hashed at rest, Bearer guard, revocation; global `AuthGuard` (cookie first, then Bearer) with `@Public()` opt-out.
+- Projects CRUD with ownership enforcement (`getOwned` is the v1 tenancy boundary); write-only secrets: PUT/DELETE/list-keys only, AES-256-GCM (`iv|tag|ciphertext`) via `SecretBox` keyed from `AGENTFORGE_SECRET_KEY`; `SecretProvisioningService` is the worker-side decrypt-to-env path (§8) and is never exposed over HTTP.
+- Shared HTTP plumbing: per-route `ZodValidationPipe` (schemas from `packages/core`), RFC 9457 `ProblemDetailsFilter` (all errors → `application/problem+json`), cookie utils.
+- OpenAPI 3.1 at `/api/v1/openapi.json` generated from the shared Zod schemas via Zod 4's native `z.toJSONSchema` — no extra dependency.
+
+**Verified (DoD):** full-app e2e against testcontainers PG: register → login → create project → put secret → key listed but value unreadable anywhere in the API → worker-side `SecretBox` decrypts the stored ciphertext; PAT Bearer auth + revocation; 401/400 responses are RFC 9457 with Zod issue paths; logout kills the session. 33 server tests green.
+
+**Decisions:**
+
+- Zod 4's built-in JSON Schema conversion powers the OpenAPI doc (avoids a zod-openapi dependency); the doc is assembled statically in `OpenApiController` and extended per phase.
+- `@typescript-eslint/consistent-type-imports` is disabled for `apps/server` only: Nest DI resolves constructor params via `emitDecoratorMetadata`, and type-only imports of injectable classes would break injection at runtime.
+- Secret keys constrained to `UPPER_SNAKE_CASE` (they become env var names in sandboxes).
+- Dev fallback for `AGENTFORGE_SECRET_KEY` baked into env defaults; Phase 10 compose/wizard must set a real one.
+- CSRF: SameSite=Lax now; explicit Origin-check middleware deferred to Phase 10 hardening (noted in §12).

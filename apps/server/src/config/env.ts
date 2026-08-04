@@ -10,7 +10,10 @@ const envSchema = z.object({
   /** Owner/admin connection used only by the migration runner. */
   DATABASE_ADMIN_URL: z.string().default('postgres://postgres:agentforge@localhost:5432/agentforge'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
-  AGENTFORGE_SECRET_KEY: z.string().optional(),
+  /** 32-byte base64; encrypts project secrets at rest. Dev fallback only. */
+  AGENTFORGE_SECRET_KEY: z
+    .string()
+    .default(Buffer.from('dev-dev-dev-dev-dev-dev-dev-dev!').toString('base64')),
   AGENTFORGE_BASE_URL: z.string().default('http://localhost:3000'),
   AGENT_MAX_CONCURRENT_RUNS: z.coerce.number().int().positive().default(3),
   SANDBOX_DRIVER: z.enum(['process', 'docker']).default('process'),

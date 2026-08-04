@@ -19,6 +19,14 @@ export default tseslint.config(
     },
   },
   {
+    // NestJS DI resolves constructor params from decorator metadata at runtime;
+    // forcing `import type` on injectable classes would break injection.
+    files: ['apps/server/**/*.ts'],
+    rules: {
+      '@typescript-eslint/consistent-type-imports': 'off',
+    },
+  },
+  {
     // DDD domain purity (architecture invariant #3): domain layers are pure TS.
     // No framework, no ORM, no queue client, no outer-layer imports.
     files: ['apps/server/src/contexts/*/domain/**/*.ts'],

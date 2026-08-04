@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ApiModule } from './api.module';
 import { loadEnv } from './config/env';
 import { runMigrations } from './database/migration-runner';
+import { ProblemDetailsFilter } from './shared/http/problem-details.filter';
 
 async function bootstrap(): Promise<void> {
   const env = loadEnv();
@@ -10,6 +11,7 @@ async function bootstrap(): Promise<void> {
   await runMigrations(env.DATABASE_ADMIN_URL);
   const app = await NestFactory.create(ApiModule);
   app.setGlobalPrefix('api/v1');
+  app.useGlobalFilters(new ProblemDetailsFilter());
   app.enableShutdownHooks();
   await app.listen(env.API_PORT, '0.0.0.0');
   console.log(`agentforge api listening on :${env.API_PORT}`);
