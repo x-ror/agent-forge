@@ -204,3 +204,27 @@ Running log per implementation-cycle prompt. Newest phase last.
 - Gate timeout ⇒ outcome `rejected` (routes to a rejected edge when present, else fails the flow) — auto-fail with an escape hatch.
 - The engine's tick is **pure state reconciliation** — the job's `event` field is informational only; every tick is idempotent, which is what makes at-least-once delivery and blanket reconciliation ticks safe.
 - `mock-llm` moved into `@agentforge/core/conformance` (TS 7 forbids cross-package rootDir imports; it belongs to the kit anyway).
+
+---
+
+## Phase 9 — Frontend (done)
+
+**Built (per doc §10):**
+
+- **Shell**: Carbon UIShell with header project picker, g10/g100 theme toggle (persisted), logout; React Router; TanStack Query for all server state; auth screen (login/register toggle) gating the app on `/auth/me`.
+- **Task Board**: Carbon DataTable with `StatusTag` (single enum→color mapping used everywhere), per-source Sync buttons, manual task modal, Start-workflow modal (workflow dropdown), live board wake-ups over the project SSE stream → cache invalidation.
+- **Run Detail**: virtualized event feed (`@tanstack/react-virtual`), per-type event rendering (message/thinking/tool/file/usage/result), permission requests as `ActionableNotification` allow/deny, steering input, cancel, diff tab. SSE per §10.3: messages patch local state, every (re)connect refetches from the durable `after_seq` cursor — a missed message is never assumed.
+- **Flow Run Timeline**: step accordion with status icons, kind tags, decision **route badge on the step title** + reasoning `Toggletip` in the body, links into run details, gate `Modal` (approve/reject with note → stored as reasoning), flow diff tab, flow SSE stream → detail refetch.
+- **Workflow Canvas**: `@xyflow/react` with Carbon-token BEM node skin (kind-colored borders), node palette dropdown, inspector panel (id/agent/prompt/routes/title/message + edge condition editing), client-side validation with the exact shared schema (`workflowDefinitionSchema` + `validateWorkflowGraph`) surfacing issues in an `InlineNotification` and blocking save, BFS auto-layout, canonical + **gated** template loaders, save-as-new-version for existing workflows.
+- **Diff View**: `@git-diff-view/react` (unified/side-by-side switcher, dark/light follows the app theme) wrapped in Carbon chrome — `TreeView` file list with +/- counts, per-file cards; a small splitter breaks multi-file git diffs into per-file sections.
+- **Settings**: projects, agents (adapter select from `/adapters`, model, adapter-options JSON), task sources, write-only secrets, PATs (token shown once).
+- **Playwright e2e** (the DoD): global setup boots PG+Redis testcontainers, a local bare repo with `TASKS.md`, a scripted mock Anthropic server, the real built api + worker, and `vite preview`; the test then drives the REAL stack through the browser: register → create project → register 3 api-loop agents → store `ANTHROPIC_API_KEY` secret → add file task source → sync board → load the gated template on the canvas → save → start the flow → watch implement/triage (route badge + reasoning toggletip) → deep review runs, light never → approve the human gate with a note → flow `succeeded` → PR branch shown → diff tab shows the agent's file → task `done`. Passes in ~6s.
+
+**Bugs the e2e caught:** the `file` task-source provider never bootstrapped the mirror (only the GitHub provider had been exercised) — now `ensureMirror` runs on fetch.
+
+**Decisions:**
+
+- Diff rendering via **`@git-diff-view/react`** and **BEM-only styling** (no inline styles except the virtualizer's computed transform/height) — both per user direction mid-phase; all component CSS lives in `src/styles/components.scss` under `.af-*` blocks.
+- `@tanstack/react-virtual` added for the event feed (justified: §10 requires a virtualized feed; stays in the TanStack family).
+- Playwright runs as `pnpm test:e2e` (separate from `pnpm verify` — it needs Docker + a chromium download; CI can opt in).
+- The gate-before-PR template ships as a first-class canvas loader, matching the §12 recommendation for externally-triggered flows.

@@ -1,28 +1,107 @@
-import { Content, Header, HeaderMenuButton, HeaderName, SideNav, SideNavItems, SideNavLink, Theme } from '@carbon/react';
-import { useState } from 'react';
+import { Content, Dropdown, Header, HeaderGlobalAction, HeaderGlobalBar, HeaderName, InlineLoading, SideNav, SideNavItems, SideNavLink, Theme } from '@carbon/react';
+import { Asleep, Light, Logout } from '@carbon/icons-react';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { useMe, useLogout, useProjects } from './api/hooks';
+import { useAppState } from './state/app-state';
+import { LoginPage } from './features/auth/LoginPage';
+import { TaskBoardPage } from './features/tasks/TaskBoardPage';
+import { WorkflowsPage } from './features/workflows/WorkflowsPage';
+import { WorkflowCanvasPage } from './features/workflows/WorkflowCanvasPage';
+import { FlowRunsPage } from './features/flows/FlowRunsPage';
+import { FlowRunPage } from './features/flows/FlowRunPage';
+import { RunDetailPage } from './features/runs/RunDetailPage';
+import { SettingsPage } from './features/settings/SettingsPage';
+
+function ProjectPicker() {
+  const { projectId, setProjectId } = useAppState();
+  const projects = useProjects();
+  const items = projects.data ?? [];
+  const selected = items.find((p) => p.id === projectId) ?? null;
+  return (
+    <div className="af-shell__project-picker">
+      <Dropdown
+        id="project-picker"
+        size="sm"
+        label="Select project"
+        titleText=""
+        items={items}
+        itemToString={(p) => p?.name ?? ''}
+        selectedItem={selected}
+        onChange={({ selectedItem }) => setProjectId(selectedItem?.id ?? null)}
+      />
+    </div>
+  );
+}
 
 export default function App() {
-  const [sideNavExpanded, setSideNavExpanded] = useState(true);
+  const { theme, toggleTheme } = useAppState();
+  const me = useMe();
+  const logout = useLogout();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  if (me.isLoading) {
+    return (
+      <Theme theme={theme}>
+        <Content>
+          <InlineLoading description="Loading AgentForge…" />
+        </Content>
+      </Theme>
+    );
+  }
+
+  if (me.isError) {
+    return (
+      <Theme theme={theme}>
+        <LoginPage />
+      </Theme>
+    );
+  }
+
+  const nav = [
+    { to: '/', label: 'Task Board' },
+    { to: '/workflows', label: 'Workflows' },
+    { to: '/flow-runs', label: 'Flow Runs' },
+    { to: '/settings', label: 'Settings' },
+  ];
 
   return (
-    <Theme theme="g100">
+    <Theme theme={theme}>
       <Header aria-label="AgentForge">
-        <HeaderMenuButton aria-label={sideNavExpanded ? 'Close menu' : 'Open menu'} onClick={() => setSideNavExpanded(!sideNavExpanded)} isActive={sideNavExpanded} />
-        <HeaderName href="/" prefix="">
+        <HeaderName as={Link} to="/" prefix="">
           AgentForge
         </HeaderName>
+        <HeaderGlobalBar>
+          <ProjectPicker />
+          <HeaderGlobalAction aria-label="Toggle theme" onClick={toggleTheme}>
+            {theme === 'g100' ? <Light size={20} /> : <Asleep size={20} />}
+          </HeaderGlobalAction>
+          <HeaderGlobalAction aria-label="Log out" onClick={() => logout.mutate(undefined, { onSuccess: () => navigate('/') })}>
+            <Logout size={20} />
+          </HeaderGlobalAction>
+        </HeaderGlobalBar>
       </Header>
-      <SideNav aria-label="Side navigation" expanded={sideNavExpanded} isPersistent>
+      <SideNav aria-label="Side navigation" expanded isPersistent isChildOfHeader>
         <SideNavItems>
-          <SideNavLink href="/">Task Board</SideNavLink>
-          <SideNavLink href="/workflows">Workflows</SideNavLink>
-          <SideNavLink href="/flow-runs">Flow Runs</SideNavLink>
-          <SideNavLink href="/settings">Settings</SideNavLink>
+          {nav.map((item) => (
+            <SideNavLink key={item.to} as={Link} to={item.to} isActive={location.pathname === item.to}>
+              {item.label}
+            </SideNavLink>
+          ))}
         </SideNavItems>
       </SideNav>
-      <Content>
-        <h1>AgentForge</h1>
-        <p>Orchestrate autonomous coding agents — local-first.</p>
+      <Content className="af-shell__content">
+        <Routes>
+          <Route path="/" element={<TaskBoardPage />} />
+          <Route path="/workflows" element={<WorkflowsPage />} />
+          <Route path="/workflows/new" element={<WorkflowCanvasPage />} />
+          <Route path="/workflows/:id" element={<WorkflowCanvasPage />} />
+          <Route path="/flow-runs" element={<FlowRunsPage />} />
+          <Route path="/flow-runs/:id" element={<FlowRunPage />} />
+          <Route path="/runs/:id" element={<RunDetailPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </Content>
     </Theme>
   );

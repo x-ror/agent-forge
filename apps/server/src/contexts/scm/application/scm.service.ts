@@ -45,7 +45,7 @@ export class ScmService {
   }
 
   /** Mirror clone if absent (idempotent; clone lands via temp dir + rename). */
-  async ensureMirror(project: Project): Promise<string> {
+  async ensureMirror(project: Pick<Project, 'id' | 'repoUrl'>): Promise<string> {
     const mirror = this.mirrorPath(project.id);
     if (existsSync(mirror)) return mirror;
     await mkdir(path.dirname(mirror), { recursive: true });

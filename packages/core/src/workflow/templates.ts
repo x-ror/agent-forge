@@ -4,6 +4,30 @@ import type { WorkflowDefinition } from './schema';
  * The canonical Implement → Triage → Review → PR workflow (design doc §7.2).
  * Shipped as a seed template; also the fixture the engine e2e runs.
  */
+/**
+ * Canonical + a human gate before the PR — the recommended default for flows
+ * fed by external task sources (design doc §12, prompt-injection stance).
+ */
+export function gatedWorkflowTemplate(): { name: string; definition: WorkflowDefinition } {
+  const base = canonicalWorkflowTemplate.definition;
+  return {
+    name: 'Implement → Review → Gate → PR',
+    definition: {
+      nodes: [
+        ...base.nodes.filter((n) => n.id !== 'pr'),
+        { id: 'gate', type: 'gate.human', message: 'Review the diff before the PR is opened.' },
+        ...base.nodes.filter((n) => n.id === 'pr'),
+      ],
+      edges: [
+        ...base.edges.filter((e) => e.to !== 'pr'),
+        { from: 'deep', to: 'gate', on: 'succeeded' },
+        { from: 'light', to: 'gate', on: 'succeeded' },
+        { from: 'gate', to: 'pr', on: 'approved' },
+      ].filter((e, i, all) => all.findIndex((o) => o.from === e.from && o.to === e.to && o.on === e.on) === i),
+    },
+  };
+}
+
 export const canonicalWorkflowTemplate: { name: string; definition: WorkflowDefinition } = {
   name: 'Implement → Review → PR',
   definition: {

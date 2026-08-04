@@ -1,0 +1,220 @@
+/* BEM component styles. Carbon supplies the design system; these classes
+   only cover layout and the two custom surfaces (canvas skin, diff view). */
+
+/* ---- shell ---- */
+.af-shell__content {
+  margin-left: 16rem;
+}
+
+.af-shell__project-picker {
+  width: 240px;
+  margin-right: 0.5rem;
+}
+
+/* ---- login ---- */
+.af-login {
+  margin-top: 10vh;
+}
+
+.af-login__tile {
+  padding: 2rem;
+}
+
+/* ---- page chrome ---- */
+.af-page__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.af-page__header-title {
+  margin: 0;
+}
+
+.af-page__header--spread {
+  justify-content: space-between;
+}
+
+/* ---- run detail ---- */
+.af-run-feed {
+  padding: 0;
+}
+
+.af-run-feed__scroll {
+  height: 55vh;
+  overflow: auto;
+  padding: 0.5rem 1rem;
+}
+
+.af-run-feed__spacer {
+  position: relative;
+}
+
+.af-run-feed__row-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+.af-event-row {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--cds-border-subtle);
+}
+
+.af-event-row__label {
+  color: var(--cds-text-helper);
+  margin-right: 0.5rem;
+}
+
+.af-event-row__label,
+.af-event-row__mono {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+}
+
+.af-event-row__thinking {
+  font-style: italic;
+  color: var(--cds-text-helper);
+}
+
+.af-run-detail__steer {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* ---- flow timeline ---- */
+.af-step-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.af-step-body {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.af-step-icon--succeeded {
+  color: var(--cds-support-success);
+}
+
+.af-step-icon--failed {
+  color: var(--cds-support-error);
+}
+
+.af-step-icon--active {
+  color: var(--cds-support-info);
+}
+
+.af-step-icon--idle {
+  color: var(--cds-text-helper);
+}
+
+/* ---- workflow canvas ---- */
+.af-canvas-page {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 1rem;
+  height: 78vh;
+}
+
+.af-canvas-page__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.af-canvas-page__toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.af-canvas-page__toolbar-name {
+  max-width: 280px;
+}
+
+.af-canvas-page__toolbar-add {
+  min-width: 220px;
+}
+
+.af-canvas-page__flow {
+  flex: 1;
+  border: 1px solid var(--cds-border-subtle);
+}
+
+.af-canvas-page__inspector {
+  height: 100%;
+  overflow: auto;
+}
+
+.af-canvas-node {
+  background: var(--cds-layer);
+  border: 2px solid var(--cds-border-interactive);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  min-width: 170px;
+  font-size: 0.75rem;
+}
+
+.af-canvas-node--trigger {
+  border-color: var(--cds-support-info);
+}
+
+.af-canvas-node--decision {
+  border-color: var(--cds-support-caution-major, #ff832b);
+}
+
+.af-canvas-node--gate {
+  border-color: var(--cds-support-warning);
+}
+
+.af-canvas-node--selected {
+  border-color: var(--cds-focus);
+}
+
+.af-canvas-node__type {
+  color: var(--cds-text-helper);
+}
+
+/* ---- diff view (@git-diff-view/react wrapped in Carbon chrome) ---- */
+.af-diff {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.af-diff__tree {
+  min-width: 260px;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.af-diff__files {
+  flex: 1;
+  overflow-x: auto;
+}
+
+.af-diff__file {
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--cds-border-subtle);
+}
+
+.af-diff__file-header {
+  font-family: 'IBM Plex Mono', monospace;
+  padding: 0.5rem 0.75rem;
+  background: var(--cds-layer-accent);
+  margin: 0;
+}
+
+.af-diff__additions {
+  color: var(--cds-support-success);
+}
+
+.af-diff__deletions {
+  color: var(--cds-support-error);
+}

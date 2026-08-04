@@ -71,7 +71,7 @@ export class FileTasksProvider implements TaskSourceProvider {
   async fetch(source: TaskSource, ctx: TaskSourceProviderContext): Promise<ExternalTask[]> {
     const config = source.config as { path?: string; ref?: string };
     const filePath = config.path ?? 'TASKS.md';
-    const mirror = this.scm.mirrorPath(ctx.projectId);
+    const mirror = await this.scm.ensureMirror({ id: ctx.projectId, repoUrl: ctx.projectRepoUrl });
     const { stdout } = await this.git.run(['-C', mirror, 'show', `${config.ref ?? 'HEAD'}:${filePath}`]);
 
     const tasks: ExternalTask[] = [];
