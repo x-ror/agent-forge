@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AgentRegistryModule } from '../agent-registry/agent-registry.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { ScmModule } from '../scm/scm.module';
 import { APP_ENV, type AppEnv } from '../../config/env';
 import { RunOrchestrator } from './application/run-orchestrator';
 import { executionRepositoryProviders } from './execution.module';
@@ -10,7 +11,7 @@ import { SANDBOX_DRIVER } from './domain/sandbox';
 
 /** Worker-side execution module: the run orchestrator + sandbox drivers. */
 @Module({
-  imports: [ProjectsModule, AgentRegistryModule],
+  imports: [ProjectsModule, AgentRegistryModule, ScmModule],
   providers: [
     RunOrchestrator,
     ...executionRepositoryProviders,

@@ -8,6 +8,7 @@ import { connectApp } from '../helpers/pg';
 import { HttpClient, startTestApp, type TestApp } from '../helpers/app';
 import { buildTestWorker, type TestWorker } from '../helpers/worker';
 import { startMockLlm, type MockLlm } from '../../../../packages/core/test/helpers/mock-llm';
+import { makeLocalRepo } from '../helpers/git';
 
 const TEST_KEY = Buffer.from('0123456789abcdef0123456789abcdef').toString('base64');
 
@@ -130,5 +131,54 @@ describe('Phase 5 e2e: real api-loop run against a mocked LLM server', () => {
     // The mock server saw the provisioned API key from the encrypted secret.
     const request = llm.requests[0] as { body: unknown };
     expect(request).toBeDefined();
+  });
+
+  it('runs in a real git worktree when the repo is clonable; diff endpoint serves the change', async () => {
+    const repo = makeLocalRepo();
+    const project = await http.post('/projects', {
+      name: 'git-project',
+      repoUrl: repo.url,
+      settings: { allowedCommands: ['echo'] },
+    });
+    const gitProjectId = (project.body as { id: string }).id;
+    await http.put(`/projects/${gitProjectId}/secrets/ANTHROPIC_API_KEY`, { value: 'sk-mock' });
+
+    llm.pushAnthropic({
+      blocks: [
+        {
+          type: 'tool_use',
+          id: 'g1',
+          name: 'write_file',
+          input: { path: 'feature.txt', content: 'the feature\n' },
+        },
+      ],
+    });
+    llm.pushAnthropic({ blocks: [{ type: 'text', text: 'feature added' }] });
+
+    const created = await http.post('/runs', {
+      projectId: gitProjectId,
+      agentId,
+      prompt: 'add the feature',
+    });
+    const runId = (created.body as { id: string }).id;
+
+    const deadline = Date.now() + 30_000;
+    for (;;) {
+      const status = ((await http.get(`/runs/${runId}`)).body as { status: string }).status;
+      if (status === 'succeeded') break;
+      if (['failed', 'cancelled'].includes(status) || Date.now() > deadline) {
+        throw new Error(`unexpected status ${status}`);
+      }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+
+    // Branch assigned from the worktree; diff artifact captured at finalize.
+    const run = (await http.get(`/runs/${runId}`)).body as { branch: string | null };
+    expect(run.branch).toMatch(/^agentforge\//);
+
+    const diff = await http.get(`/runs/${runId}/diff`);
+    expect(diff.status).toBe(200);
+    expect((diff.body as { diff: string }).diff).toContain('feature.txt');
+    expect((diff.body as { diff: string }).diff).toContain('the feature');
   });
 });

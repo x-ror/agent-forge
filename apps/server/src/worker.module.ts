@@ -1,5 +1,7 @@
 import { Injectable, Module, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import { ExecutionWorkerModule } from './contexts/execution/execution-worker.module';
+import { ProjectsModule } from './contexts/projects/projects.module';
+import { ScmModule } from './contexts/scm/scm.module';
 import { DatabaseModule } from './database/database.module';
 import { EnvModule } from './shared/env.module';
 import { OutboxDispatcher } from './shared/outbox/outbox-dispatcher.service';
@@ -39,6 +41,8 @@ export class WorkerLifecycle implements OnModuleInit, OnApplicationShutdown {
     QueueModule,
     OutboxModule,
     ExecutionWorkerModule,
+    ScmModule,
+    ProjectsModule,
   ],
   providers: [
     OutboxDispatcher,

@@ -9,6 +9,8 @@ import { Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { APP_ENV, type AppEnv } from '../config/env';
 import { RunOrchestrator } from '../contexts/execution/application/run-orchestrator';
+import { PROJECT_REPOSITORY, type ProjectRepository } from '../contexts/projects/domain/repositories';
+import { ScmService } from '../contexts/scm/application/scm.service';
 
 /**
  * BullMQ consumers (worker entrypoint only). Each Worker gets its own
@@ -22,7 +24,9 @@ export class ProcessorsService implements OnModuleInit, OnApplicationShutdown {
 
   constructor(
     @Inject(APP_ENV) private readonly env: AppEnv,
+    @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     private readonly runOrchestrator: RunOrchestrator,
+    private readonly scm: ScmService,
   ) {}
 
   onModuleInit(): void {
@@ -35,6 +39,17 @@ export class ProcessorsService implements OnModuleInit, OnApplicationShutdown {
         {
           connection: new IORedis(this.env.REDIS_URL, { maxRetriesPerRequest: null }),
           concurrency: this.env.AGENT_MAX_CONCURRENT_RUNS,
+        },
+      ),
+      new Worker(
+        'repo.sync',
+        async (job) => {
+          const project = await this.projects.findById((job.data as { projectId: string }).projectId);
+          if (project) await this.scm.syncMirror(project);
+        },
+        {
+          connection: new IORedis(this.env.REDIS_URL, { maxRetriesPerRequest: null }),
+          concurrency: 2,
         },
       ),
     );

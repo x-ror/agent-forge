@@ -26,6 +26,9 @@ import type { RunEvent } from '../domain/run-event';
 import { RUN_EVENT_REPOSITORY, type RunEventRepository } from '../domain/repositories';
 import { RunsService } from '../application/runs.service';
 
+import { NotFoundException } from '@nestjs/common';
+import { ARTIFACT_REPOSITORY, type ArtifactRepository } from '../domain/repositories';
+
 const SSE_HEARTBEAT_MS = 25_000;
 
 function toDto(run: Run): RunDto {
@@ -61,6 +64,7 @@ export class RunsController {
     private readonly runs: RunsService,
     private readonly pubsub: PubSubListener,
     @Inject(RUN_EVENT_REPOSITORY) private readonly events: RunEventRepository,
+    @Inject(ARTIFACT_REPOSITORY) private readonly artifacts: ArtifactRepository,
   ) {}
 
   @Post()
@@ -84,6 +88,30 @@ export class RunsController {
   ): Promise<RunEventDto[]> {
     const events = await this.runs.listEvents(user.userId, id, Number(afterSeq ?? 0));
     return events.map(toEventDto);
+  }
+
+  /** Cumulative diff — served from the finalize-time artifact (api has no workspaces volume). */
+  @Get(':id/diff')
+  async diff(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ): Promise<{ diff: string; baseRef: string | null }> {
+    await this.runs.getAccessible(user.userId, id);
+    const artifacts = await this.artifacts.listByRun(id);
+    const diff = artifacts.filter((a) => a.kind === 'diff').at(-1);
+    if (!diff?.content) throw new NotFoundException('no diff captured for this run');
+    const baseRef = (diff.meta as { baseRef?: string }).baseRef ?? null;
+    return { diff: diff.content.toString('utf8'), baseRef };
+  }
+
+  @Get(':id/artifacts')
+  async listArtifacts(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ): Promise<Array<{ id: string; kind: string; name: string; meta: unknown }>> {
+    await this.runs.getAccessible(user.userId, id);
+    const artifacts = await this.artifacts.listByRun(id);
+    return artifacts.map((a) => ({ id: a.id, kind: a.kind, name: a.name, meta: a.meta }));
   }
 
   @Post(':id/inputs')

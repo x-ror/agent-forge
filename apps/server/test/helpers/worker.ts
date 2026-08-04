@@ -26,10 +26,15 @@ import { OutboxWriter } from '../../src/shared/outbox/outbox.writer';
 import { QUEUE_CONFIG, QUEUE_NAMES, type QueueName } from '../../src/shared/queue/queues';
 import type { QueueMap } from '../../src/shared/queue/queue.module';
 import { ReconciliationService } from '../../src/worker/reconciliation.service';
+import { ScmService } from '../../src/contexts/scm/application/scm.service';
+import { GitCli } from '../../src/contexts/scm/infrastructure/git-cli';
+import { GithubClient } from '../../src/contexts/scm/infrastructure/github-client';
+import { TypeormArtifactRepository } from '../../src/contexts/execution/infrastructure/typeorm-repositories';
 
 export interface TestWorker {
   registry: AdapterRegistry;
   orchestrator: RunOrchestrator;
+  scm: ScmService;
   dispatcher: OutboxDispatcher;
   reconciliation: ReconciliationService;
   queues: QueueMap;
@@ -66,6 +71,14 @@ export function buildTestWorker(
     secretBox,
   );
 
+  const scm = new ScmService(
+    env,
+    new TypeormArtifactRepository(ds),
+    new GitCli(),
+    new GithubClient(),
+    secretProvisioning,
+  );
+
   const orchestrator = new RunOrchestrator(
     new TypeormRunRepository(ds),
     new TypeormRunInputRepository(ds),
@@ -75,6 +88,7 @@ export function buildTestWorker(
     env,
     registry,
     secretProvisioning,
+    scm,
     txOps,
   );
 
@@ -95,6 +109,7 @@ export function buildTestWorker(
   return {
     registry,
     orchestrator,
+    scm,
     dispatcher,
     reconciliation,
     queues: queueMap,

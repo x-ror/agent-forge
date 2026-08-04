@@ -141,3 +141,22 @@ Running log per implementation-cycle prompt. Newest phase last.
 - claude-code's mock CLI fixture speaks the real stream-json shapes (init/session_id, control_request/response, result with cost) so the mapping is tested without the actual binary; the `--version` handshake plus conformance keeps the contract honest when the real CLI lands.
 - `allowed_commands` semantics: `undefined` = unrestricted (project didn't opt into gating), `[]` = gate everything, else prefix allow-list; `'*'` wildcard supported.
 - codex-cli / openhands / aider adapters remain unimplemented (doc lists them as adapter family members; the two shipped ones cover both integration styles — API loop and CLI stdio). Adding one later is exactly the §6.5 checklist.
+
+---
+
+## Phase 6 — Scm context: mirrors, worktrees, PR (done)
+
+**Built:**
+
+- `ScmService` behind domain ports (`GitPort`→`GitCli`, `GithubPort`→`GithubClient`): idempotent `--mirror` clone (staging-dir + rename), `repo.sync` mirror refresh, worktree lifecycle from the mirror (`git worktree add -b agentforge/<name>`, reattach on recovery), cumulative diff (`git add -N` + `git diff <baseRef>` so untracked files count), commit-all snapshotting, worktree removal.
+- Push + PR with worker-held tokens: pushes to the explicit repo URL (a `--mirror` clone's `origin` has mirror push semantics we must not inherit), token injected as `x-access-token` for GitHub HTTPS; PR via fetch-based GitHub client (`githubApiUrl` project setting overrides the API base for tests/GHE); patch-artifact fallback (`git format-patch`) whenever the push target is unusable; `pr` artifacts record URL/number/branch.
+- Orchestrator integration: standalone runs now provision a real worktree when the repo is clonable (branch recorded on the run), degrade loudly to a plain directory otherwise; finalize commits agent work and stores the cumulative-diff artifact.
+- API: `GET /runs/:id/diff` (served from the finalize artifact — the api container has no workspaces volume by design §11.1) and `GET /runs/:id/artifacts`; `repo.sync` BullMQ consumer in the worker.
+
+**Verified (DoD):** integration test on a local bare repo — mirror → worktree → fake step changes files → cumulative diff contains them → push lands `agentforge/task-42` on the bare remote with the changed content → PR flow against a mocked GitHub API (auth header, head/base assertions, `PR #7` artifact) → patch fallback produces a `format-patch` artifact when the remote is unreachable; `repo.sync` pulls upstream commits (negative refspec keeps local work branches safe); e2e: run in a real worktree gets an `agentforge/` branch and `GET /runs/:id/diff` returns the agent's change. 51 server tests green.
+
+**Decisions:**
+
+- Mirror fetch uses `+refs/heads/*:refs/heads/*` with a **negative refspec** `^refs/heads/agentforge/*` and no prune: our work branches live in worktrees (git refuses to fetch into checked-out branches) and may not exist upstream.
+- Diffs are served from artifacts, not live worktrees — the api process has no workspaces volume (§11.1); live change visibility comes from streamed `file.change` events.
+- Run finalize happens inline in the orchestrator (not via the `run.finalize` queue): retry semantics for commit+diff are simpler inside the run's own job; the queue remains for future PR/notify decoupling.

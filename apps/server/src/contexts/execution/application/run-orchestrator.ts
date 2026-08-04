@@ -11,6 +11,7 @@ import {
 import { APP_ENV, type AppEnv } from '../../../config/env';
 import { EventTypes, type IntegrationEvent } from '../../../shared/outbox/integration-event';
 import { AdapterRegistry } from '../../agent-registry/application/adapter-registry';
+import { ScmService } from '../../scm/application/scm.service';
 import { AGENT_REPOSITORY, type AgentRepository } from '../../agent-registry/domain/agent';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../projects/domain/repositories';
 import { SecretProvisioningService } from '../../projects/application/projects.service';
@@ -54,6 +55,7 @@ export class RunOrchestrator {
     @Inject(APP_ENV) private readonly env: AppEnv,
     private readonly registry: AdapterRegistry,
     private readonly secrets: SecretProvisioningService,
+    private readonly scm: ScmService,
     @Inject(RUN_TX) private readonly tx: RunTxPort,
   ) {}
 
@@ -118,9 +120,33 @@ export class RunOrchestrator {
       const project = await this.projects.findById(run.projectId);
       if (!project) throw new Error(`project ${run.projectId} not found`);
 
-      const workdir =
-        run.workspacePath ?? path.join(this.env.WORKSPACES_DIR, 'runs', run.id);
-      run.setWorkspacePath(workdir);
+      let workdir = run.workspacePath;
+      if (!workdir) {
+        try {
+          // Standalone runs get a throwaway worktree of their own (§8).
+          const worktree = await this.scm.createWorktree(project, {
+            kind: 'run',
+            id: run.id,
+            name: `run-${run.id.slice(-12)}`,
+            baseRef: run.baseRef,
+          });
+          workdir = worktree.path;
+          run.setBranch(worktree.branch);
+        } catch (error) {
+          // No usable git remote: degrade to a plain directory, visibly.
+          workdir = path.join(this.env.WORKSPACES_DIR, 'runs', run.id);
+          await this.tx.saveRunAndEvents(run, [
+            {
+              type: 'orchestrator.status',
+              payload: {
+                status: 'provisioning',
+                note: `no git worktree (${String(error).slice(0, 300)}); using plain directory`,
+              },
+            },
+          ]);
+        }
+        run.setWorkspacePath(workdir);
+      }
 
       const env = await this.secrets.decryptedEnv(run.projectId);
       sandbox = await this.sandboxDriver.create({
@@ -307,7 +333,12 @@ export class RunOrchestrator {
     await this.tx.saveRunAndEvents(run, [
       { type: 'orchestrator.status', payload: { status: 'finalizing' } },
     ]);
-    // Diff capture / artifacts land here in Phase 6 via run.finalize.
+    // Snapshot agent work as a commit + cumulative diff artifact (§8).
+    try {
+      await this.scm.finalizeRunWorkspace(run.snapshot());
+    } catch (error) {
+      this.logger.warn(`finalize workspace for run ${run.id} failed: ${String(error)}`);
+    }
 
     if (outcome.result.outcome === 'success') {
       run.succeed();
