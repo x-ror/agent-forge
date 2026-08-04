@@ -16,7 +16,8 @@ services:
   redis:
     image: redis:7-alpine
     # AOF is a nice-to-have; the system survives total Redis loss (§5.4).
-    command: ['redis-server', '--appendonly', 'yes']
+    # Empty requirepass = auth disabled; set REDIS_PASSWORD in .env.
+    command: ['redis-server', '--appendonly', 'yes', '--requirepass', '${REDIS_PASSWORD:-}']
     volumes:
       - redisdata:/data
 
@@ -28,7 +29,7 @@ services:
     environment: &appenv
       DATABASE_URL: postgres://agentforge_app:${AGENTFORGE_APP_DB_PASSWORD:-agentforge_app}@postgres:5432/agentforge
       DATABASE_ADMIN_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/agentforge
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379
       AGENTFORGE_SECRET_KEY: ${AGENTFORGE_SECRET_KEY:?set AGENTFORGE_SECRET_KEY in .env (32-byte base64)}
       AGENTFORGE_BASE_URL: http://localhost:3000
       WORKSPACES_DIR: /data/workspaces
