@@ -107,6 +107,58 @@ export const agentDtoSchema = z.object({
 });
 export type AgentDto = z.infer<typeof agentDtoSchema>;
 
+// ---- Tasking ---------------------------------------------------------------
+export const taskStatusSchema = z.enum(['backlog', 'in_flow', 'done', 'failed', 'archived']);
+export type TaskStatusDto = z.infer<typeof taskStatusSchema>;
+
+export const taskSourceKindSchema = z.enum(['github_issues', 'jira', 'file', 'manual']);
+
+export const createTaskSourceRequestSchema = z.object({
+  projectId: z.uuid(),
+  kind: taskSourceKindSchema,
+  config: z.record(z.string(), z.unknown()).default({}),
+  syncCron: z.string().max(100).nullable().optional(),
+});
+export type CreateTaskSourceRequest = z.infer<typeof createTaskSourceRequestSchema>;
+
+export const taskSourceDtoSchema = z.object({
+  id: z.uuid(),
+  projectId: z.uuid(),
+  kind: taskSourceKindSchema,
+  config: z.record(z.string(), z.unknown()),
+  syncCron: z.string().nullable(),
+  lastSyncedAt: z.iso.datetime().nullable(),
+});
+export type TaskSourceDto = z.infer<typeof taskSourceDtoSchema>;
+
+export const createTaskRequestSchema = z.object({
+  projectId: z.uuid(),
+  title: z.string().min(1).max(500),
+  body: z.string().max(100_000).default(''),
+});
+export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
+
+export const updateTaskRequestSchema = z.object({
+  status: taskStatusSchema.optional(),
+  title: z.string().min(1).max(500).optional(),
+  body: z.string().max(100_000).optional(),
+});
+export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
+
+export const taskDtoSchema = z.object({
+  id: z.uuid(),
+  projectId: z.uuid(),
+  sourceId: z.uuid().nullable(),
+  externalKey: z.string().nullable(),
+  title: z.string(),
+  body: z.string(),
+  status: taskStatusSchema,
+  meta: z.record(z.string(), z.unknown()),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export type TaskDto = z.infer<typeof taskDtoSchema>;
+
 // ---- Runs ------------------------------------------------------------------
 export const runStatusSchema = z.enum([
   'queued',

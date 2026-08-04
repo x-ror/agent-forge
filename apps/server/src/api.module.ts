@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { AgentRegistryModule } from './contexts/agent-registry/agent-registry.module';
 import { ExecutionModule } from './contexts/execution/execution.module';
+import { TaskingModule } from './contexts/tasking/tasking.module';
 import { IdentityModule } from './contexts/identity/identity.module';
 import { ProjectsModule } from './contexts/projects/projects.module';
 import { DatabaseModule } from './database/database.module';
@@ -19,7 +21,9 @@ import { RedisModule } from './shared/redis/redis.module';
     OutboxModule,
     IdentityModule,
     ProjectsModule,
+    AgentRegistryModule,
     ExecutionModule,
+    TaskingModule,
   ],
   controllers: [HealthController, OpenApiController],
 })

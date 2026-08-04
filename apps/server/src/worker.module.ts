@@ -2,6 +2,8 @@ import { Injectable, Module, type OnApplicationShutdown, type OnModuleInit } fro
 import { ExecutionWorkerModule } from './contexts/execution/execution-worker.module';
 import { ProjectsModule } from './contexts/projects/projects.module';
 import { ScmModule } from './contexts/scm/scm.module';
+import { TaskingModule } from './contexts/tasking/tasking.module';
+import { NotificationsModule } from './contexts/notifications/notifications.module';
 import { DatabaseModule } from './database/database.module';
 import { EnvModule } from './shared/env.module';
 import { OutboxDispatcher } from './shared/outbox/outbox-dispatcher.service';
@@ -43,6 +45,8 @@ export class WorkerLifecycle implements OnModuleInit, OnApplicationShutdown {
     ExecutionWorkerModule,
     ScmModule,
     ProjectsModule,
+    TaskingModule,
+    NotificationsModule,
   ],
   providers: [
     OutboxDispatcher,

@@ -14,6 +14,6 @@ import { GithubClient } from './infrastructure/github-client';
     { provide: GITHUB_PORT, useClass: GithubClient },
     ...executionRepositoryProviders,
   ],
-  exports: [ScmService, GITHUB_PORT],
+  exports: [ScmService, GIT_PORT, GITHUB_PORT],
 })
 export class ScmModule {}

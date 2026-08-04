@@ -160,3 +160,23 @@ Running log per implementation-cycle prompt. Newest phase last.
 - Mirror fetch uses `+refs/heads/*:refs/heads/*` with a **negative refspec** `^refs/heads/agentforge/*` and no prune: our work branches live in worktrees (git refuses to fetch into checked-out branches) and may not exist upstream.
 - Diffs are served from artifacts, not live worktrees — the api process has no workspaces volume (§11.1); live change visibility comes from streamed `file.change` events.
 - Run finalize happens inline in the orchestrator (not via the `run.finalize` queue): retry semantics for commit+diff are simpler inside the run's own job; the queue remains for future PR/notify decoupling.
+
+---
+
+## Phase 7 — Tasking context (done)
+
+**Built:**
+
+- `TaskSourceProvider` port with three implementations: **GitHub Issues** (open issues, label filter, PRs filtered out, `owner/repo#N` external keys, `githubApiUrl` override), **file** (markdown checklist `- [ ]` lines in the repo, read from the mirror via `git show`), **Jira** (stub interface per plan).
+- `TaskSyncService` (`task.sync` consumer): fetch → `upsertSynced` on `(source_id, external_key)` → `last_synced_at` + `task.synced` outbox event in one tx. Local board status is never overwritten by re-sync.
+- Task sources CRUD + `POST /task-sources/:id/sync` (emits `task.sync_requested`; the dispatcher enqueues — even manual syncs go through the outbox), task board `GET /tasks?projectId&status&cursor` with keyset pagination + `nextCursor`, manual task creation, `PATCH /tasks/:id` with §3.1 transition enforcement (illegal moves → 400 problem+json) and `task.status_changed` outbox events.
+- Board SSE at `GET /tasks/stream/:projectId`: stateless wake-up notifications (`task.synced` / `task.status_changed`, project-filtered) — clients refetch the board; no cursor needed since the board is a snapshot, not a log.
+- **Notifications context**: `notify.deliver` consumer with channels `log`, `webhook`, and `github-comment` (outcome write-back to the source issue — worker-held token, §12).
+- `task.sync` + `notify.deliver` BullMQ consumers registered in the worker.
+
+**Verified (DoD):** e2e with a mocked GitHub API — sync populates the board (2 issues; the PR the issues API also returns is filtered); re-sync after an upstream title edit is idempotent (2 tasks, updated title, locally-moved `in_flow` status preserved); board `task.synced` message arrives over SSE during sync; illegal transition rejected; keyset pagination pages without overlap; `github-comment` write-back posts to `/issues/1/comments` with the token. 79 tests green across packages.
+
+**Decisions:**
+
+- The board SSE is deliberately cursor-less (unlike run streams): it's a wake-up channel over snapshot data; the durable-cursor machinery stays where the data is an append-only log.
+- File-source task keys are `file:<path>:<slug(title)>` — retitling a checklist line creates a new task rather than silently rebinding history (recorded; simplest consistent choice).
