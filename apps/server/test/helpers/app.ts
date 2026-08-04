@@ -3,19 +3,22 @@ import type { INestApplication } from '@nestjs/common';
 import { ApiModule } from '../../src/api.module';
 import { ProblemDetailsFilter } from '../../src/shared/http/problem-details.filter';
 import { startMigratedPg, type PgTestContext } from './pg';
+import { startRedis, type RedisTestContext } from './redis';
 
 export interface TestApp {
   app: INestApplication;
   baseUrl: string;
   pg: PgTestContext;
+  redis: RedisTestContext;
   stop(): Promise<void>;
 }
 
-/** Boots the full api application against a fresh migrated PG container. */
+/** Boots the full api application against fresh migrated PG + Redis containers. */
 export async function startTestApp(env: Record<string, string> = {}): Promise<TestApp> {
-  const pg = await startMigratedPg();
+  const [pg, redis] = await Promise.all([startMigratedPg(), startRedis()]);
   process.env.DATABASE_URL = pg.appUrl;
   process.env.DATABASE_ADMIN_URL = pg.adminUrl;
+  process.env.REDIS_URL = redis.url;
   for (const [key, value] of Object.entries(env)) process.env[key] = value;
 
   const moduleRef = await Test.createTestingModule({ imports: [ApiModule] }).compile();
@@ -30,9 +33,11 @@ export async function startTestApp(env: Record<string, string> = {}): Promise<Te
     app,
     baseUrl,
     pg,
+    redis,
     stop: async () => {
       await app.close();
       await pg.stop();
+      await redis.stop();
     },
   };
 }

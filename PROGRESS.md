@@ -73,3 +73,27 @@ Running log per implementation-cycle prompt. Newest phase last.
 - Secret keys constrained to `UPPER_SNAKE_CASE` (they become env var names in sandboxes).
 - Dev fallback for `AGENTFORGE_SECRET_KEY` baked into env defaults; Phase 10 compose/wizard must set a real one.
 - CSRF: SameSite=Lax now; explicit Origin-check middleware deferred to Phase 10 hardening (noted in §12).
+
+---
+
+## Phase 3 — Event backbone: outbox + BullMQ + reconciliation (done)
+
+**Built:**
+
+- `OutboxWriter.append(em, events)` — same-transaction append (the only legal cross-process effect path); `UnitOfWork.withTx` helper; both provided by a global `OutboxModule`.
+- `OutboxDispatcher` (worker): 250ms poll, batch 100, `FOR UPDATE SKIP LOCKED`, drains bursts, enqueues BullMQ jobs with deterministic jobIds, publishes every row on the `agentforge:events` pub/sub channel (SSE wake-ups), marks `dispatched_at` in the same tx.
+- Event routing table (`event-routing.ts`): `run.requested`→`run.execute`, `run.finalize_requested`→`run.finalize`, run terminal events→`flow.advance` when `payload.flowRunId` present, `gate.*`/`decision.made`/`flow.advance_requested`→`flow.advance`, `task.sync_requested`/`repo.sync_requested`/`notify.requested`→their queues; notification-only events (e.g. `run.event_appended`) are pub/sub-only.
+- BullMQ queue module with the full §5.2 topology and per-queue retry policy (`run.execute` attempts=1 — recovery is reconciliation-shaped, not retry-shaped).
+- `ReconciliationService` (boot + every 60s, all against Postgres): re-enqueues execute jobs for queued runs, ticks running flows with no active step, counts stale-lease active runs (recovery behavior lands in Phase 4).
+- Worker heartbeat in Redis (transient by design); `/api/v1/health` now reports PG, Redis, heartbeat freshness, and per-queue depths.
+- In-process `DomainEventBus` for post-commit same-process reactions.
+
+**Verified (DoD):** integration tests with PG+Redis testcontainers — (a) run+outbox commit/rollback atomically and a crash before dispatch loses nothing (the surviving row dispatches later); (b) `FLUSHALL` then reconciliation re-enqueues from Postgres, and undispatched rows also survive a flush; (c) duplicate dispatch after a simulated crash-between-enqueue-and-mark is a no-op thanks to deterministic jobIds. Manual boot check: api+worker against dev compose → health `ok` with fresh heartbeat and all queues. 38 server tests green.
+
+**Decisions:**
+
+- **Plain `bullmq` instead of `@nestjs/bullmq`**: the wrapper's decorator/processor model assumes one app entrypoint and fights the api/worker split; explicit `Queue`/`Worker` wiring in a small `QueueModule` keeps control (queues stay BullMQ 5 on Redis 7 per the fixed stack). TypeORM 0.3 and BullMQ 5 were also explicitly pinned — pnpm resolves newer majors (typeorm 1.x, bullmq 6.x) by default in 2026.
+- **BullMQ 5.81 forbids `:` in custom job ids** — deterministic ids use `__` (e.g. `flow.advance__<flowRunId>__<outboxId>`), semantics unchanged from the doc's `flow.advance:<id>:<seq>` scheme.
+- Single pub/sub channel (`agentforge:events`) carrying `{eventType, aggregateType, aggregateId, payload}`; SSE endpoints filter client-side of Redis. Simpler than per-run channels at this scale.
+- Worker heartbeat lives in Redis (not PG): it is health telemetry, self-repopulating within 10s — an acceptable transient after a flush.
+- A simple hand-rolled `DomainEventBus` instead of `@nestjs/cqrs` — the doc's tier-1 usage (post-commit local reactions) doesn't justify the dependency.
