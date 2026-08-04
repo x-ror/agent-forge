@@ -28,3 +28,26 @@ Running log per implementation-cycle prompt. Newest phase last.
 - Two DB URLs planned from the start: `DATABASE_URL` (restricted app role — append-only audit tables) and `DATABASE_ADMIN_URL` (migration runner only). The design doc's append-only-grants requirement implies two roles; the migration for Phase 1 creates the app role.
 
 **Open questions:** none blocking.
+
+---
+
+## Phase 1 — Persistence & migrations (done)
+
+**Built:**
+
+- Hand-written SQL migration (`1754300000001-initial-schema`) implementing the full §4 DDL: uuidv7 PKs, `run_status`/`flow_status` enums, partial indexes (`runs_active`, `flow_runs_active`, `outbox_pending`, `run_inputs_pending`), citext emails — plus the Identity tables the doc implies but doesn't spell out (`sessions`, `personal_access_tokens`).
+- Append-only enforcement, two lines of defense as specified: (a) grants — app role `agentforge_app` has no UPDATE/DELETE on `run_events`/`outbox_events` except a column-level `UPDATE (dispatched_at)`; (b) triggers — `run_events` fully immutable even for admin; `outbox_events` immutable except `dispatched_at`, DELETE only via `prune_dispatched_outbox(interval)` (SECURITY DEFINER, GUC-guarded).
+- Advisory-lock migration runner (`pg_advisory_lock` on a dedicated QueryRunner so lock/unlock share a session), run by api at boot against `DATABASE_ADMIN_URL`.
+- SnakeNamingStrategy; TypeORM persistence entities per context `infrastructure/`; repository implementations + domain mappers for all aggregates (Identity, Projects, AgentRegistry, Tasking, Execution, Orchestration).
+- Domain aggregates: `Run` and `FlowRun` as behavior-rich state machines (illegal transitions throw domain errors), `Task` lifecycle transition map, app-side UUIDv7 generator.
+
+**Verified (DoD):** testcontainers PG 18 — migrations apply to empty DB and re-run as no-op; UPDATE/DELETE on `run_events` as app role → `permission denied`, as admin → trigger exception; outbox `dispatched_at`-only update rule proven both ways; `prune_dispatched_outbox` works for app role; round-trip tests for every aggregate incl. per-run monotonic `run_events.seq`, citext email lookup, task upsert preserving local status, workflow versioning (`listLatest` returns v2). 26 server tests green.
+
+**Decisions:**
+
+- **Two DB roles.** Migrations run as the owner (`DATABASE_ADMIN_URL`); the app connects as `agentforge_app` (`DATABASE_URL`), created by the first migration with the password taken from `DATABASE_URL` — single source of truth, no extra env var.
+- **`dispatched_at` column-grant exception**: §4 says "no UPDATE/DELETE grants" for outbox, §2.4 requires the dispatcher to mark `dispatched_at`; resolved with a column-level grant + a trigger that rejects any other field change.
+- **Outbox pruning** (doc: "dispatched rows are pruned after 7 days") is only possible through a SECURITY DEFINER function, keeping direct DELETE blocked even for admin.
+- **Extra `runs` columns** beyond §4: `workspace_path` (standalone-run worktree) and `resume_state` (adapter §6.1 `ResumeState` persisted by the orchestrator) — both needed by Phases 4–5; added now to avoid a churn migration.
+- **Re-sync never overwrites task status** — `upsertSynced` updates title/body/meta only; board lifecycle is locally owned.
+- jsonb entity columns are typed `unknown` at the persistence layer (TypeORM's DeepPartial recursion breaks on recursive `Json`); typed casts live in the repository mappers, which is where translation belongs anyway.
