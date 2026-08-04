@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parseEnv } from 'node:util';
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -20,8 +23,49 @@ const envSchema = z.object({
 
 export type AppEnv = z.infer<typeof envSchema>;
 
-export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
-  return envSchema.parse(source);
+/**
+ * Merges a dotenv file into `target` WITHOUT overriding variables that are
+ * already set — real environment always wins (the same precedence Node's
+ * `--env-file` flag uses). Node-native parsing; no dotenv dependency.
+ */
+export function applyEnvFile(file: string, target: NodeJS.ProcessEnv = process.env): boolean {
+  if (!existsSync(file)) return false;
+  let parsed: Record<string, string>;
+  try {
+    parsed = parseEnv(readFileSync(file, 'utf8')) as Record<string, string>;
+  } catch {
+    return false; // unreadable/binary file: ignore, real env still applies
+  }
+  for (const [key, value] of Object.entries(parsed)) {
+    target[key] ??= value;
+  }
+  return true;
+}
+
+/**
+ * .env discovery for the two entrypoints: an explicit AGENTFORGE_ENV_FILE
+ * beats a `.env` in the working directory, which beats the repo-root `.env`
+ * (the one docker compose also reads) when running from apps/server.
+ */
+export function loadEnvFiles(target: NodeJS.ProcessEnv = process.env): string[] {
+  const candidates = [target.AGENTFORGE_ENV_FILE, path.resolve(process.cwd(), '.env'), path.resolve(process.cwd(), '../../.env')].filter((file): file is string => !!file);
+  const loaded: string[] = [];
+  for (const file of candidates) {
+    if (applyEnvFile(file, target)) loaded.push(file);
+  }
+  return loaded;
+}
+
+let envFilesLoaded = false;
+
+export function loadEnv(source?: NodeJS.ProcessEnv): AppEnv {
+  // Only implicit process.env loads pull in .env files; explicit sources
+  // (tests) parse exactly what they were given.
+  if (!source && !envFilesLoaded) {
+    envFilesLoaded = true;
+    loadEnvFiles();
+  }
+  return envSchema.parse(source ?? process.env);
 }
 
 /** DI token for the parsed environment. */

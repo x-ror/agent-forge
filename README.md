@@ -43,6 +43,8 @@ pnpm --filter @agentforge/frontend test:e2e   # Playwright: full-stack canonical
 
 Dev servers: `pnpm --filter @agentforge/server dev` (api, tsc watch + node --watch), `dev:worker`, and `pnpm --filter @agentforge/frontend dev` (Vite on :3000, proxying `/api/v1` to :3001).
 
+The api and worker read `.env` files natively (no dotenv dependency): an explicit `AGENTFORGE_ENV_FILE`, then `./.env`, then the repo-root `.env` — and real environment variables always take precedence over file values. The dev defaults already match `docker-compose.dev.yml`, so a `.env` is only needed to override them (see the commented dev section in `.env.example`).
+
 Integration tests use testcontainers — they start their own Postgres/Redis and need nothing pre-running except Docker.
 
 ## Architecture in one paragraph
