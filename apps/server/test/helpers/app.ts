@@ -53,6 +53,10 @@ export class HttpClient {
   }
   private bearer: string | undefined;
 
+  cookieHeader(): string | undefined {
+    return this.cookie;
+  }
+
   async request(
     method: string,
     path: string,

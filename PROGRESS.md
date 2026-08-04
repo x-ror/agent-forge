@@ -97,3 +97,25 @@ Running log per implementation-cycle prompt. Newest phase last.
 - Single pub/sub channel (`agentforge:events`) carrying `{eventType, aggregateType, aggregateId, payload}`; SSE endpoints filter client-side of Redis. Simpler than per-run channels at this scale.
 - Worker heartbeat lives in Redis (not PG): it is health telemetry, self-repopulating within 10s — an acceptable transient after a flush.
 - A simple hand-rolled `DomainEventBus` instead of `@nestjs/cqrs` — the doc's tier-1 usage (post-commit local reactions) doesn't justify the dependency.
+
+---
+
+## Phase 4 — Execution context: runs, events, SSE (done)
+
+**Built:**
+
+- **RunOrchestrator** (worker): owns a run inside one `run.execute` job — sandbox provisioning, adapter start, normalized event ingestion (Zod-validated at the boundary; unmappable events preserved as `type: raw` with `payload.raw`), 15s lease heartbeat on `lease_at`, input pump (message → `send`, approval → `respondToPermission` + `awaiting_input`→`running`, cancel → `stop`), wall-clock timeout, terminal transitions with outbox events carrying `flowRunId`/`structured` for the future engine.
+- **Recovery per §5.4**: reconciliation enqueues time-bucketed recovery jobs for stale-lease active runs; the orchestrator resumes via `adapter.resume` + persisted `resume_state` when the capability exists, otherwise fails honestly with an `orchestrator.crash_recovered` timeline event, preserving the workspace.
+- **Sandbox abstraction** as a domain port: `process` driver (child processes, path-escape protection, output caps) and `docker` driver (container per step via docker CLI: workdir bind-mount at /workspace, `--network none` policy, memory/cpu/pids limits, labeled `agentforge.run`); selected by `SANDBOX_DRIVER`.
+- **SSE** `GET /runs/:id/events/stream`: durable cursor = `run_events.seq` = SSE event id; `Last-Event-ID` resume; Redis pub/sub as wake-up only (every drain reads Postgres); coalesced re-drains; 25s heartbeat; nginx-friendly headers. Plus `POST /runs`, `GET /runs/:id`, `GET /runs/:id/events?after_seq`, `POST /runs/:id/inputs` (message/approval/cancel via shared discriminated-union schema).
+- `RunTxPort` (domain port) implemented by `RunTxOps` (infrastructure): run state + `run_events` + outbox rows in one tx, per-run monotonic seq.
+- `AdapterRegistry` + `AgentRegistryModule`; BullMQ consumer registration in `ProcessorsService` (worker-only, own blocking connections).
+
+**Verified (DoD):** e2e with a scripted fake adapter — create run over HTTP → SSE stream → disconnect after 4 events → reconnect with `Last-Event-ID` → combined stream has seqs 1..N with **no gaps and no duplicates**, all nine protocol semantics observed (incl. permission approve while disconnected and mid-run steering that reaches the adapter); cancel input → run `cancelled`; simulated worker crash (active run, stale lease) → reconciliation → non-resumable adapter fails with `orchestrator.crash_recovered`, resumable adapter resumes from its checkpoint and succeeds. 42 server tests green.
+
+**Decisions:**
+
+- The ESLint layer rules forced (correctly) two refactors: sandbox driver interface and `RunTxPort` now live in `domain/` as ports; implementations stay in `infrastructure/`.
+- `AgentHandle` gained an optional `getResumeState?(): Json` — the doc's `resume(ctx, state)` needs the orchestrator to have persisted state from somewhere; adapters expose a cheap checkpoint after each event batch. Backward compatible with §6.1.
+- Docker driver shells out to the docker CLI instead of adding dockerode: worker image controls the CLI version, `execFile` is auditable, and no new dependency (recorded per working rules). `llm-only` currently degrades to `full` with a loud warning; the proxy sidecar is Phase 10 work.
+- Cross-context read `flowRunIdFor(runId)` (execution → flow_steps) is raw SQL inside `RunTxOps`, documented as the seam to revisit when Orchestration lands in Phase 8.

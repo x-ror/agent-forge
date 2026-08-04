@@ -90,6 +90,11 @@ export interface AgentHandle {
   respondToPermission(id: string, decision: 'allow' | 'deny', note?: string): Promise<void>;
   /** Graceful stop, then SIGKILL after grace period. */
   stop(reason: StopReason): Promise<void>;
+  /**
+   * Adapter-specific checkpoint the orchestrator persists for `resume`
+   * (capability `resume`). Called after event batches; cheap and sync.
+   */
+  getResumeState?(): Json;
 }
 
 export interface AgentAdapter {

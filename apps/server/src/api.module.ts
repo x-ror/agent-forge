@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ExecutionModule } from './contexts/execution/execution.module';
 import { IdentityModule } from './contexts/identity/identity.module';
 import { ProjectsModule } from './contexts/projects/projects.module';
 import { DatabaseModule } from './database/database.module';
@@ -18,6 +19,7 @@ import { RedisModule } from './shared/redis/redis.module';
     OutboxModule,
     IdentityModule,
     ProjectsModule,
+    ExecutionModule,
   ],
   controllers: [HealthController, OpenApiController],
 })

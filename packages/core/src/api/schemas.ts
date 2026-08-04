@@ -107,6 +107,64 @@ export const agentDtoSchema = z.object({
 });
 export type AgentDto = z.infer<typeof agentDtoSchema>;
 
+// ---- Runs ------------------------------------------------------------------
+export const runStatusSchema = z.enum([
+  'queued',
+  'provisioning',
+  'running',
+  'awaiting_input',
+  'finalizing',
+  'succeeded',
+  'failed',
+  'cancelled',
+]);
+export type RunStatusDto = z.infer<typeof runStatusSchema>;
+
+export const createRunRequestSchema = z.object({
+  projectId: z.uuid(),
+  agentId: z.uuid(),
+  prompt: z.string().min(1).max(100_000),
+  baseRef: z.string().min(1).max(200).optional(),
+});
+export type CreateRunRequest = z.infer<typeof createRunRequestSchema>;
+
+export const runDtoSchema = z.object({
+  id: z.uuid(),
+  projectId: z.uuid(),
+  agentId: z.uuid(),
+  status: runStatusSchema,
+  taskPrompt: z.string(),
+  baseRef: z.string(),
+  branch: z.string().nullable(),
+  usage: z.record(z.string(), z.unknown()),
+  error: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  startedAt: z.iso.datetime().nullable(),
+  finishedAt: z.iso.datetime().nullable(),
+});
+export type RunDto = z.infer<typeof runDtoSchema>;
+
+export const runEventDtoSchema = z.object({
+  runId: z.uuid(),
+  seq: z.number().int(),
+  ts: z.iso.datetime(),
+  type: z.string(),
+  payload: z.unknown(),
+});
+export type RunEventDto = z.infer<typeof runEventDtoSchema>;
+
+export const runInputRequestSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('message'), text: z.string().min(1).max(20_000) }),
+  z.object({
+    kind: z.literal('approval'),
+    permissionId: z.string().min(1),
+    decision: z.enum(['allow', 'deny']),
+    note: z.string().max(2000).optional(),
+  }),
+  z.object({ kind: z.literal('cancel'), reason: z.string().max(2000).optional() }),
+]);
+export type RunInputRequest = z.infer<typeof runInputRequestSchema>;
+
 // ---- Problem details (RFC 9457) -------------------------------------------
 export const problemDetailsSchema = z.object({
   type: z.string(),

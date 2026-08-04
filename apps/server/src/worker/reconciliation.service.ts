@@ -66,15 +66,25 @@ export class ReconciliationService {
         report.requeuedFlows += 1;
       }
 
-      // Stale-lease active runs: counted here; Phase 4 adds resume/recovery.
-      const stale: Array<{ count: string }> = await this.ds.query(
-        `SELECT count(*) AS count FROM runs
+      // Stale-lease active runs → recovery jobs; the orchestrator decides
+      // resume vs honest crash_recovered failure (§5.4).
+      const stale: Array<{ id: string }> = await this.ds.query(
+        `SELECT id FROM runs
           WHERE status IN ('provisioning','running','awaiting_input','finalizing')
             AND (lease_at IS NULL OR lease_at < now() - interval '90 seconds')`,
       );
-      report.staleActiveRuns = Number(stale[0]?.count ?? 0);
+      report.staleActiveRuns = stale.length;
+      // Time-bucketed jobId: retryable later, deduped within the window.
+      const bucket = Math.floor(Date.now() / 300_000);
+      for (const { id } of stale) {
+        await this.queues['run.execute'].add(
+          'run.execute',
+          { runId: id },
+          { jobId: `run.execute__${id}__recover__${bucket}` },
+        );
+      }
       if (report.staleActiveRuns > 0) {
-        this.logger.warn(`${report.staleActiveRuns} active run(s) with stale lease`);
+        this.logger.warn(`${report.staleActiveRuns} stale run(s) queued for recovery`);
       }
     } catch (error) {
       this.logger.error(`reconciliation failed: ${String(error)}`);

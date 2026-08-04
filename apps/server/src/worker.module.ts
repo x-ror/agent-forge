@@ -1,4 +1,5 @@
 import { Injectable, Module, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
+import { ExecutionWorkerModule } from './contexts/execution/execution-worker.module';
 import { DatabaseModule } from './database/database.module';
 import { EnvModule } from './shared/env.module';
 import { OutboxDispatcher } from './shared/outbox/outbox-dispatcher.service';
@@ -6,6 +7,7 @@ import { OutboxModule } from './shared/outbox/outbox.module';
 import { QueueModule } from './shared/queue/queue.module';
 import { RedisModule } from './shared/redis/redis.module';
 import { WorkerHeartbeat } from './worker/heartbeat.service';
+import { ProcessorsService } from './worker/processors.service';
 import { ReconciliationService } from './worker/reconciliation.service';
 
 @Injectable()
@@ -30,7 +32,20 @@ export class WorkerLifecycle implements OnModuleInit, OnApplicationShutdown {
 }
 
 @Module({
-  imports: [EnvModule, DatabaseModule, RedisModule, QueueModule, OutboxModule],
-  providers: [OutboxDispatcher, ReconciliationService, WorkerHeartbeat, WorkerLifecycle],
+  imports: [
+    EnvModule,
+    DatabaseModule,
+    RedisModule,
+    QueueModule,
+    OutboxModule,
+    ExecutionWorkerModule,
+  ],
+  providers: [
+    OutboxDispatcher,
+    ReconciliationService,
+    WorkerHeartbeat,
+    WorkerLifecycle,
+    ProcessorsService,
+  ],
 })
 export class WorkerModule {}
