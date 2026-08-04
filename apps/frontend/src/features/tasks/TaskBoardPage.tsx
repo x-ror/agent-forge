@@ -26,6 +26,7 @@ import { useCreateTask, useStartFlow, useSyncTaskSource, useTaskBoard, useTaskSo
 import { useSse } from '../../api/sse';
 import { useAppState } from '../../state/app-state';
 import { StatusTag } from '../../components/StatusTag';
+import { formatDateTime } from '../../components/format';
 
 const HEADERS = [
   { key: 'title', header: 'Task' },
@@ -120,7 +121,7 @@ export function TaskBoardPage() {
     title: task.title,
     status: task.status,
     externalKey: task.externalKey ?? 'manual',
-    updatedAt: new Date(task.updatedAt).toLocaleString(),
+    updatedAt: formatDateTime(task.updatedAt),
   }));
   const byId = new Map((board.data?.tasks ?? []).map((t) => [t.id, t]));
 
@@ -161,7 +162,7 @@ export function TaskBoardPage() {
                         <StatusTag status={task.status} />
                       </TableCell>
                       <TableCell>{task.externalKey ?? 'manual'}</TableCell>
-                      <TableCell>{new Date(task.updatedAt).toLocaleString()}</TableCell>
+                      <TableCell className="af-cell--nowrap">{formatDateTime(task.updatedAt)}</TableCell>
                       <TableCell>
                         {task.status === 'backlog' && (
                           <Button kind="tertiary" size="sm" renderIcon={Play} onClick={() => setStartFor(task)}>
@@ -174,6 +175,12 @@ export function TaskBoardPage() {
                 })}
               </TableBody>
             </Table>
+            {renderRows.length === 0 && (
+              <Tile className="af-empty-state">
+                <h4>No tasks yet</h4>
+                <p>Sync a task source or add a manual task to fill the board.</p>
+              </Tile>
+            )}
           </TableContainer>
         )}
       </DataTable>

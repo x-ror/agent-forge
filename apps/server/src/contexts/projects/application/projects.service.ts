@@ -4,6 +4,7 @@ import { uuidv7 } from '../../../shared/uuidv7';
 import type { Project, ProjectSettings } from '../domain/project';
 import { PROJECT_REPOSITORY, SECRET_REPOSITORY, type ProjectRepository, type SecretRepository } from '../domain/repositories';
 import { SecretBoxService } from '../../../shared/crypto/secret-box';
+import { DefaultBranchProbe } from '../../scm/application/default-branch-probe';
 
 @Injectable()
 export class ProjectsService {
@@ -11,15 +12,19 @@ export class ProjectsService {
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(SECRET_REPOSITORY) private readonly secrets: SecretRepository,
     private readonly secretBox: SecretBoxService,
+    private readonly branchProbe: DefaultBranchProbe,
   ) {}
 
   async create(ownerId: string, input: CreateProjectRequest): Promise<Project> {
+    // Ask the remote rather than assuming `main` — every worktree and run bases
+    // off this value, and a wrong one only surfaces later as an invalid ref.
+    const defaultBranch = input.defaultBranch ?? (await this.branchProbe.detect(input.repoUrl)) ?? 'main';
     const project: Project = {
       id: uuidv7(),
       ownerId,
       name: input.name,
       repoUrl: input.repoUrl,
-      defaultBranch: input.defaultBranch,
+      defaultBranch,
       settings: input.settings as ProjectSettings,
       createdAt: new Date(),
     };

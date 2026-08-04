@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdtempSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { DataSource } from 'typeorm';
 import { loadEnv, type AppEnv } from '../../src/config/env';
 import { ScmService } from '../../src/contexts/scm/application/scm.service';
+import { DefaultBranchProbe } from '../../src/contexts/scm/application/default-branch-probe';
 import { GitCli } from '../../src/contexts/scm/infrastructure/git-cli';
 import { GithubClient } from '../../src/contexts/scm/infrastructure/github-client';
 import { parseGithubRepo, sanitizeBranchName } from '../../src/contexts/scm/domain/scm';
@@ -136,6 +137,34 @@ describe('Phase 6: Scm — mirrors, worktrees, diff, push, PR', () => {
       baseRef: 'main',
     });
     expect(again.path).toBe(scm.worktreePath('flow', 'flow-1'));
+  });
+
+  it('worktree add falls back to the repo default branch when the configured baseRef is missing', async () => {
+    // The classic main-vs-master trap: the project says "no-such-branch", the
+    // repo's HEAD is main — the worktree lands on the repo default instead of
+    // failing the whole flow.
+    const wt = await scm.createWorktree(project, { kind: 'flow', id: 'flow-bad-ref', name: 'task-99', baseRef: 'no-such-branch' });
+    expect(wt.baseRef).toBe('main');
+    expect(existsSync(wt.path)).toBe(true);
+  });
+
+  it('worktree add still surfaces git stderr when no ref is resolvable', async () => {
+    // Empty repo: unborn HEAD, nothing to fall back to — the error must carry
+    // `fatal: invalid reference: <ref>` (regression: was a bare "failed").
+    const empty = makeLocalRepo('main', { empty: true });
+    const emptyProject: Project = { ...project, id: '019a0000-0000-7000-8000-00000000dead', repoUrl: empty.url };
+    await expect(scm.createWorktree(emptyProject, { kind: 'flow', id: 'flow-empty', name: 'task-0', baseRef: 'main' })).rejects.toThrow(/invalid reference/);
+  });
+
+  it('detects the remote default branch rather than assuming main', async () => {
+    const probe = new DefaultBranchProbe(new GitCli());
+    expect(await probe.detect(repo.url)).toBe('main');
+
+    const legacy = makeLocalRepo('master');
+    expect(await probe.detect(legacy.url)).toBe('master');
+
+    // Unreachable remote → null, so the caller can fall back.
+    expect(await probe.detect('file:///nonexistent/nope.git')).toBeNull();
   });
 
   it('repo.sync pulls upstream updates into the mirror', async () => {

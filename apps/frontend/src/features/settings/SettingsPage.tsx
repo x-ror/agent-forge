@@ -17,6 +17,7 @@ import {
 import { TrashCan } from '@carbon/icons-react';
 import { useState } from 'react';
 import { api } from '../../api/client';
+import { formatDateTime } from '../../components/format';
 import { useAdapters, useAgents, useCreateAgent, useCreatePat, useCreateProject, useCreateTaskSource, useDeleteAgent, usePats, useProjects, useTaskSources } from '../../api/hooks';
 import { useAppState } from '../../state/app-state';
 
@@ -43,7 +44,7 @@ function ProjectsSection() {
         onSubmit={(e) => {
           e.preventDefault();
           createProject.mutate(
-            { name, repoUrl, defaultBranch: 'main', settings: {} },
+            { name, repoUrl, settings: {} },
             {
               onSuccess: (project) => {
                 setProjectId(project.id);
@@ -139,7 +140,7 @@ function SourcesSection() {
           {(sources.data ?? []).map((source) => (
             <StructuredListRow key={source.id}>
               <StructuredListCell>{source.kind}</StructuredListCell>
-              <StructuredListCell>{source.lastSyncedAt ? `synced ${new Date(source.lastSyncedAt).toLocaleString()}` : 'never synced'}</StructuredListCell>
+              <StructuredListCell className="af-cell--nowrap">{source.lastSyncedAt ? `synced ${formatDateTime(source.lastSyncedAt)}` : 'never synced'}</StructuredListCell>
             </StructuredListRow>
           ))}
         </StructuredListBody>

@@ -39,6 +39,7 @@ describe('Phase 5 e2e: real api-loop run against a mocked LLM server', () => {
     const project = await http.post('/projects', {
       name: 'loop-project',
       repoUrl: 'file:///tmp/loop.git',
+      defaultBranch: 'main', // explicit: the remote is fictional, don't probe it
       settings: { allowedCommands: ['echo', 'printf'] },
     });
     projectId = (project.body as { id: string }).id;

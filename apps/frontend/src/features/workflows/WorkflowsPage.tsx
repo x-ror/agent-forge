@@ -26,28 +26,35 @@ export function WorkflowsPage() {
           New workflow
         </Button>
       </div>
-      <StructuredListWrapper>
-        <StructuredListHead>
-          <StructuredListRow head>
-            <StructuredListCell head>Name</StructuredListCell>
-            <StructuredListCell head>Version</StructuredListCell>
-            <StructuredListCell head>Enabled</StructuredListCell>
-          </StructuredListRow>
-        </StructuredListHead>
-        <StructuredListBody>
-          {(workflows.data ?? []).map((workflow) => (
-            <StructuredListRow key={workflow.id}>
-              <StructuredListCell>
-                <Link to={`/workflows/${workflow.id}`}>{workflow.name}</Link>
-              </StructuredListCell>
-              <StructuredListCell>v{workflow.version}</StructuredListCell>
-              <StructuredListCell>
-                <Tag type={workflow.enabled ? 'green' : 'gray'}>{workflow.enabled ? 'enabled' : 'disabled'}</Tag>
-              </StructuredListCell>
+      {workflows.data && workflows.data.length === 0 ? (
+        <Tile className="af-empty-state">
+          <h4>No workflows yet</h4>
+          <p>Create one on the canvas — the canonical Implement → Review → PR template is one click away.</p>
+        </Tile>
+      ) : (
+        <StructuredListWrapper>
+          <StructuredListHead>
+            <StructuredListRow head>
+              <StructuredListCell head>Name</StructuredListCell>
+              <StructuredListCell head>Version</StructuredListCell>
+              <StructuredListCell head>Enabled</StructuredListCell>
             </StructuredListRow>
-          ))}
-        </StructuredListBody>
-      </StructuredListWrapper>
+          </StructuredListHead>
+          <StructuredListBody>
+            {(workflows.data ?? []).map((workflow) => (
+              <StructuredListRow key={workflow.id}>
+                <StructuredListCell>
+                  <Link to={`/workflows/${workflow.id}`}>{workflow.name}</Link>
+                </StructuredListCell>
+                <StructuredListCell>v{workflow.version}</StructuredListCell>
+                <StructuredListCell>
+                  <Tag type={workflow.enabled ? 'green' : 'gray'}>{workflow.enabled ? 'enabled' : 'disabled'}</Tag>
+                </StructuredListCell>
+              </StructuredListRow>
+            ))}
+          </StructuredListBody>
+        </StructuredListWrapper>
+      )}
     </div>
   );
 }

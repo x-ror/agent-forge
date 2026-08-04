@@ -1,23 +1,56 @@
 /* BEM component styles. Carbon supplies the design system; these classes
    only cover layout and the two custom surfaces (canvas skin, diff view). */
 
+/* ---- app root ---- */
+/* The Theme wrapper must paint the whole viewport — without this the body's
+   default (white) shows through under short pages and around the auth card. */
+.af-app {
+  min-height: 100vh;
+  background: var(--cds-background);
+  color: var(--cds-text-primary);
+  color-scheme: light;
+}
+
+.af-app.cds--g100 {
+  color-scheme: dark; /* native scrollbars/inputs follow the dark theme */
+}
+
 /* ---- shell ---- */
 .af-shell__content {
   margin-left: 16rem;
+  min-height: calc(100vh - 3rem); /* viewport minus the 48px header */
 }
 
 .af-shell__project-picker {
   width: 240px;
   margin-right: 0.5rem;
+  display: flex;
+  align-items: center; /* center the 32px dropdown inside the 48px header */
 }
 
-/* ---- login ---- */
+/* ---- login / setup wizard ---- */
 .af-login {
-  margin-top: 10vh;
+  padding-top: 10vh;
+  padding-bottom: 4rem;
 }
 
 .af-login__tile {
   padding: 2rem;
+}
+
+/* ---- tables ---- */
+.af-cell--nowrap {
+  white-space: nowrap;
+}
+
+.af-empty-state {
+  margin-top: 1rem;
+  padding: 2rem;
+}
+
+.af-empty-state p {
+  margin-top: 0.5rem;
+  color: var(--cds-text-secondary);
 }
 
 /* ---- page chrome ---- */

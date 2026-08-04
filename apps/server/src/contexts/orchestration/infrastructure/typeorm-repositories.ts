@@ -67,9 +67,16 @@ export class TypeormFlowRunRepository implements FlowRunRepository {
     return rows.map((row) => FlowRun.restore({ ...row, context: row.context as FlowContext }));
   }
 
-  async list(limit: number, cursor?: string): Promise<FlowRun[]> {
-    const qb = this.ds.getRepository(FlowRunEntity).createQueryBuilder('f').orderBy('f.id', 'DESC').limit(Math.min(limit, 200));
-    if (cursor) qb.where('f.id < :cursor', { cursor });
+  async list(projectIds: string[], limit: number, cursor?: string): Promise<FlowRun[]> {
+    if (projectIds.length === 0) return [];
+    const qb = this.ds
+      .getRepository(FlowRunEntity)
+      .createQueryBuilder('f')
+      .innerJoin(WorkflowEntity, 'w', 'w.id = f.workflow_id')
+      .where('w.project_id IN (:...projectIds)', { projectIds })
+      .orderBy('f.id', 'DESC')
+      .limit(Math.min(limit, 200));
+    if (cursor) qb.andWhere('f.id < :cursor', { cursor });
     const rows = await qb.getMany();
     return rows.map((row) => FlowRun.restore({ ...row, context: row.context as FlowContext }));
   }

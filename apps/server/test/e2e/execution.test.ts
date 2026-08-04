@@ -57,7 +57,7 @@ describe('Phase 4 e2e: execution (runs, SSE, recovery)', () => {
     });
     if (reg.status !== 201) throw new Error(`register failed: ${JSON.stringify(reg.body)}`);
     userId = (reg.body as { id: string }).id;
-    const project = await http.post('/projects', { name: 'p', repoUrl: 'file:///tmp/x.git' });
+    const project = await http.post('/projects', { name: 'p', repoUrl: 'file:///tmp/x.git', defaultBranch: 'main' });
     projectId = (project.body as { id: string }).id;
 
     // Agents CRUD arrives in Phase 5; insert registry rows directly.

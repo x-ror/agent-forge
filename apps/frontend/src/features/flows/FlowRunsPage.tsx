@@ -1,10 +1,22 @@
-import { StructuredListBody, StructuredListCell, StructuredListHead, StructuredListRow, StructuredListWrapper } from '@carbon/react';
+import { StructuredListBody, StructuredListCell, StructuredListHead, StructuredListRow, StructuredListWrapper, Tile } from '@carbon/react';
 import { Link } from 'react-router';
 import { useFlowRuns } from '../../api/hooks';
 import { StatusTag } from '../../components/StatusTag';
+import { formatDateTime } from '../../components/format';
 
 export function FlowRunsPage() {
   const flows = useFlowRuns();
+  if (flows.data && flows.data.length === 0) {
+    return (
+      <div>
+        <h3>Flow Runs</h3>
+        <Tile className="af-empty-state">
+          <h4>No flow runs yet</h4>
+          <p>Start a workflow from the Task Board — every run shows up here with its full timeline.</p>
+        </Tile>
+      </div>
+    );
+  }
   return (
     <div>
       <h3>Flow Runs</h3>
@@ -26,8 +38,8 @@ export function FlowRunsPage() {
               <StructuredListCell>
                 <StatusTag status={flow.status} />
               </StructuredListCell>
-              <StructuredListCell>{new Date(flow.startedAt).toLocaleString()}</StructuredListCell>
-              <StructuredListCell>{flow.finishedAt ? new Date(flow.finishedAt).toLocaleString() : '—'}</StructuredListCell>
+              <StructuredListCell className="af-cell--nowrap">{formatDateTime(flow.startedAt)}</StructuredListCell>
+              <StructuredListCell className="af-cell--nowrap">{flow.finishedAt ? formatDateTime(flow.finishedAt) : '—'}</StructuredListCell>
             </StructuredListRow>
           ))}
         </StructuredListBody>

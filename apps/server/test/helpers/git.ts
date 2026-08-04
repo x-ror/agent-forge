@@ -24,10 +24,16 @@ function git(cwd: string, ...args: string[]): string {
   });
 }
 
-/** Creates a bare repo with one initial commit on `main` — the local "GitHub". */
-export function makeLocalRepo(): LocalRepo {
+/** Creates a bare repo with one initial commit on `branch` — the local "GitHub". */
+export function makeLocalRepo(branch = 'main', opts: { empty?: boolean } = {}): LocalRepo {
+  if (opts.empty) {
+    // Bare repo with an unborn HEAD — no commits, no resolvable refs.
+    const barePath = mkdtempSync(path.join(os.tmpdir(), 'agentforge-remote-')) + '/repo.git';
+    git(path.dirname(barePath), 'init', '--bare', '-b', branch, barePath);
+    return { url: `file://${barePath}`, barePath, defaultBranch: branch };
+  }
   const work = mkdtempSync(path.join(os.tmpdir(), 'agentforge-fixture-'));
-  git(work, 'init', '-b', 'main');
+  git(work, 'init', '-b', branch);
   writeFileSync(path.join(work, 'README.md'), '# fixture\n');
   writeFileSync(path.join(work, 'src.txt'), 'original content\n');
   git(work, 'add', '-A');
@@ -35,7 +41,7 @@ export function makeLocalRepo(): LocalRepo {
 
   const barePath = mkdtempSync(path.join(os.tmpdir(), 'agentforge-remote-')) + '/repo.git';
   git(work, 'clone', '--bare', work, barePath);
-  return { url: `file://${barePath}`, barePath, defaultBranch: 'main' };
+  return { url: `file://${barePath}`, barePath, defaultBranch: branch };
 }
 
 export function listRemoteBranches(repo: LocalRepo): string[] {

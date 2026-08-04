@@ -105,6 +105,7 @@ describe('Phase 7 e2e: tasking — sync, board, SSE, write-back', () => {
     const project = await http_.post('/projects', {
       name: 'tasking',
       repoUrl: 'https://github.com/acme/widget.git',
+      defaultBranch: 'main', // explicit: the remote is fictional, don't probe it
       settings: { githubApiUrl: ghBase },
     });
     projectId = (project.body as { id: string }).id;

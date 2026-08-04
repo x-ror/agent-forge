@@ -50,7 +50,8 @@ export const projectSettingsSchema = z
 export const createProjectRequestSchema = z.object({
   name: z.string().min(1).max(200),
   repoUrl: z.string().min(1).max(1000),
-  defaultBranch: z.string().min(1).max(200).default('main'),
+  /** Omit to detect it from the remote's HEAD (falls back to `main`). */
+  defaultBranch: z.string().min(1).max(200).optional(),
   settings: projectSettingsSchema.default({}),
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;

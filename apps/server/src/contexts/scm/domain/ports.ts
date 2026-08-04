@@ -2,7 +2,10 @@ import type { GithubRepo } from './scm';
 
 /** Port: git CLI execution (implemented by infrastructure GitCli). */
 export interface GitPort {
-  run(args: string[], opts?: { cwd?: string; env?: Record<string, string>; allowFail?: boolean }): Promise<{ exitCode: number; stdout: string; stderr: string }>;
+  run(
+    args: string[],
+    opts?: { cwd?: string; env?: Record<string, string>; allowFail?: boolean; timeoutMs?: number },
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }>;
 }
 export const GIT_PORT = Symbol('GitPort');
 

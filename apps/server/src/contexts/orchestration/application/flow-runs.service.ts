@@ -83,9 +83,12 @@ export class FlowRunsService {
   }
 
   async list(userId: string, limit: number, cursor?: string): Promise<FlowRun[]> {
-    // v1: single-user self-host; list is filtered by ownership check per flow detail.
-    void userId;
-    return this.flowRuns.list(limit, cursor);
+    const owned = await this.projects.list(userId);
+    return this.flowRuns.list(
+      owned.map((p) => p.id),
+      limit,
+      cursor,
+    );
   }
 
   /** gate.human resolution (§7.1): approve/reject → engine tick. */

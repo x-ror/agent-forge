@@ -21,6 +21,10 @@ async function pushTurn(blocks: unknown[]): Promise<void> {
 
 test('canonical flow is fully drivable from the UI', async ({ page }) => {
   // ---- register ------------------------------------------------------------
+  // Seed a first user via the API so the app deterministically shows the
+  // login page — a fresh DB shows the first-boot wizard instead (the wizard
+  // path is covered by the production-compose smoke journey, not this spec).
+  await page.request.post('/api/v1/auth/register', { data: { email: 'seed@agentforge.local', password: 'seed-password-1' } });
   await page.goto('/');
   await page.getByText('Create a new account').click();
   await page.getByLabel('Email').fill('e2e@agentforge.local');

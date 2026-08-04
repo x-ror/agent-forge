@@ -78,7 +78,6 @@ export function SetupWizard({ onDone }: { onDone: () => void }) {
                     const project = await api.post<{ id: string }>('/projects', {
                       name: projectName,
                       repoUrl,
-                      defaultBranch: 'main',
                       settings: {},
                     });
                     setLocalProjectId(project.id);

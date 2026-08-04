@@ -61,6 +61,7 @@ describe('Phase 2 e2e: identity & projects', () => {
     const created = await http.post('/projects', {
       name: 'demo',
       repoUrl: 'https://github.com/acme/demo.git',
+      defaultBranch: 'main', // explicit: the remote is fictional, don't probe it
     });
     expect(created.status).toBe(201);
     projectId = (created.body as { id: string }).id;

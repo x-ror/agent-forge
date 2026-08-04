@@ -9,7 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "vite build && playwright test"
   },
   "dependencies": {
     "@agentforge/core": "workspace:*",

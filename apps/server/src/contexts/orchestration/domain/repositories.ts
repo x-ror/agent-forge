@@ -16,7 +16,8 @@ export interface FlowRunRepository {
   save(flowRun: FlowRun): Promise<void>;
   findById(id: string): Promise<FlowRun | null>;
   listActive(): Promise<FlowRun[]>;
-  list(limit: number, cursor?: string): Promise<FlowRun[]>;
+  /** Newest-first, restricted to flows whose workflow belongs to one of the projects. */
+  list(projectIds: string[], limit: number, cursor?: string): Promise<FlowRun[]>;
 }
 
 export interface FlowStepRepository {

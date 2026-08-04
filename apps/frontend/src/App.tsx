@@ -1,6 +1,7 @@
 import { Content, Dropdown, Header, HeaderGlobalAction, HeaderGlobalBar, HeaderName, InlineLoading, SideNav, SideNavItems, SideNavLink, Theme } from '@carbon/react';
 import { Asleep, Light, Logout } from '@carbon/icons-react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api/client';
 import { useMe, useLogout, useProjects } from './api/hooks';
@@ -20,6 +21,14 @@ function ProjectPicker() {
   const projects = useProjects();
   const items = projects.data ?? [];
   const selected = items.find((p) => p.id === projectId) ?? null;
+
+  // Auto-select: no picked project (fresh login) or a stale id pointing at a
+  // deleted project both fall back to the first project instead of an empty
+  // "No project selected" screen.
+  useEffect(() => {
+    const first = items[0];
+    if (first && !selected) setProjectId(first.id);
+  }, [items, selected, setProjectId]);
   return (
     <div className="af-shell__project-picker">
       <Dropdown
@@ -51,7 +60,7 @@ export default function App() {
 
   if (me.isLoading) {
     return (
-      <Theme theme={theme}>
+      <Theme className="af-app" theme={theme}>
         <Content>
           <InlineLoading description="Loading AgentForge…" />
         </Content>
@@ -60,7 +69,22 @@ export default function App() {
   }
 
   if (me.isError) {
-    return <Theme theme={theme}>{bootstrap.data?.needsSetup ? <SetupWizard onDone={() => void qc.invalidateQueries()} /> : <LoginPage />}</Theme>;
+    // Wait for the bootstrap answer — rendering LoginPage while it's in
+    // flight flashes the wrong screen on first boot (wizard vs login race).
+    if (!bootstrap.data) {
+      return (
+        <Theme className="af-app" theme={theme}>
+          <Content>
+            <InlineLoading description="Loading AgentForge…" />
+          </Content>
+        </Theme>
+      );
+    }
+    return (
+      <Theme className="af-app" theme={theme}>
+        {bootstrap.data.needsSetup ? <SetupWizard onDone={() => void qc.invalidateQueries()} /> : <LoginPage />}
+      </Theme>
+    );
   }
 
   const nav = [
@@ -71,7 +95,7 @@ export default function App() {
   ];
 
   return (
-    <Theme theme={theme}>
+    <Theme className="af-app" theme={theme}>
       <Header aria-label="AgentForge">
         <HeaderName as={Link} to="/" prefix="">
           AgentForge

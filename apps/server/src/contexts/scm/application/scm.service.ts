@@ -91,17 +91,37 @@ export class ScmService {
     if (existsSync(wtPath)) {
       return { path: wtPath, branch, baseRef: opts.baseRef };
     }
+    const baseRef = await this.resolveBaseRef(mirror, opts.baseRef);
     await mkdir(path.dirname(wtPath), { recursive: true });
-    const result = await this.git.run(['-C', mirror, 'worktree', 'add', '-b', branch, wtPath, opts.baseRef], { allowFail: true });
+    const result = await this.git.run(['-C', mirror, 'worktree', 'add', '-b', branch, wtPath, baseRef], { allowFail: true });
     if (result.exitCode !== 0) {
       if (/already exists/.test(result.stderr)) {
         // Branch left over from a previous attempt — reattach.
         await this.git.run(['-C', mirror, 'worktree', 'add', wtPath, branch]);
       } else {
-        throw new ScmError(`worktree add failed`, result.stderr);
+        // stderr in the message, not just the field — callers log String(error),
+        // and `fatal: invalid reference: <ref>` is the whole diagnosis.
+        throw new ScmError(`worktree add ${branch} from ${baseRef} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 500)}`, result.stderr);
       }
     }
-    return { path: wtPath, branch, baseRef: opts.baseRef };
+    return { path: wtPath, branch, baseRef };
+  }
+
+  /**
+   * The configured default branch is a user guess ("main") that often doesn't
+   * match the repository ("master"). When the ref is absent from the mirror,
+   * fall back to the mirror's own HEAD branch instead of failing the flow.
+   */
+  private async resolveBaseRef(mirror: string, baseRef: string): Promise<string> {
+    const exists = await this.git.run(['-C', mirror, 'rev-parse', '--verify', '--quiet', `${baseRef}^{commit}`], { allowFail: true });
+    if (exists.exitCode === 0) return baseRef;
+    const head = await this.git.run(['-C', mirror, 'symbolic-ref', '--short', 'HEAD'], { allowFail: true });
+    const headBranch = head.stdout.trim();
+    if (head.exitCode === 0 && headBranch && headBranch !== baseRef) {
+      this.logger.warn(`baseRef '${baseRef}' not found in mirror ${mirror}; falling back to repo default '${headBranch}'`);
+      return headBranch;
+    }
+    return baseRef; // let worktree add fail with git's own diagnostic
   }
 
   /** Cumulative diff vs baseRef, including untracked files (intent-to-add). */

@@ -6,14 +6,17 @@ const GIT_TIMEOUT_MS = 120_000;
 
 @Injectable()
 export class GitCli {
-  async run(args: string[], opts: { cwd?: string; env?: Record<string, string>; allowFail?: boolean } = {}): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  async run(
+    args: string[],
+    opts: { cwd?: string; env?: Record<string, string>; allowFail?: boolean; timeoutMs?: number } = {},
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
       execFile(
         'git',
         args,
         {
           cwd: opts.cwd,
-          timeout: GIT_TIMEOUT_MS,
+          timeout: opts.timeoutMs ?? GIT_TIMEOUT_MS,
           maxBuffer: 64 * 1024 * 1024,
           env: {
             ...process.env,
