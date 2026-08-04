@@ -3,12 +3,12 @@ import type { Json } from '@agentforge/core';
 export const TASK_STATUSES = ['backlog', 'in_flow', 'done', 'failed', 'archived'] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-/** §3.1: backlog → in_flow → done | failed → archived (+ failed → backlog retry). */
+/** §3.1: backlog → in_flow → done | failed → archived (+ failed → backlog | in_flow resume). */
 const TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
   backlog: ['in_flow', 'archived'],
   in_flow: ['done', 'failed', 'backlog'],
   done: ['archived'],
-  failed: ['archived', 'backlog'],
+  failed: ['archived', 'backlog', 'in_flow'], // in_flow = resume same flow after failure
   archived: [],
 };
 

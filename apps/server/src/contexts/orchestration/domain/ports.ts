@@ -29,7 +29,8 @@ export interface TickOps {
   insertStep(step: FlowStep): Promise<void>;
   /** Create the run backing an agent/decision step (+ run.requested outbox). */
   insertRun(args: { runId: string; agentId: string; prompt: string; baseRef: string; workspacePath: string | null; branch: string | null; structured: Json | null }): Promise<void>;
-  setFlowStatus(status: FlowStatus, finishedAt?: Date): Promise<void>;
+  /** Pass `finishedAt: null` to clear (resume after failure). */
+  setFlowStatus(status: FlowStatus, finishedAt?: Date | null): Promise<void>;
   mergeFlowContext(patch: FlowContext): Promise<void>;
   setTaskStatus(status: string): Promise<void>;
   appendOutbox(events: IntegrationEvent[]): Promise<void>;

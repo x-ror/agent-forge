@@ -5,12 +5,12 @@ export type FlowStatus = (typeof FLOW_STATUSES)[number];
 
 export const ACTIVE_FLOW_STATUSES: readonly FlowStatus[] = ['running', 'awaiting_input'];
 
-/** §3.1: running ⇄ awaiting_input → succeeded | failed | cancelled */
+/** §3.1: running ⇄ awaiting_input → succeeded | failed | cancelled; failed → running (resume). */
 const TRANSITIONS: Record<FlowStatus, readonly FlowStatus[]> = {
   running: ['awaiting_input', 'succeeded', 'failed', 'cancelled'],
   awaiting_input: ['running', 'failed', 'cancelled'],
   succeeded: [],
-  failed: [],
+  failed: ['running', 'cancelled'], // resume retry, or abandon session → backlog
   cancelled: [],
 };
 
@@ -96,6 +96,12 @@ export class FlowRun {
 
   resume(): void {
     this.transition('running');
+  }
+
+  /** Re-open a failed flow so the engine can re-run failed nodes (keeps prior context/worktree). */
+  reopenForResume(): void {
+    this.transition('running');
+    this.props.finishedAt = null;
   }
 
   succeed(now = new Date()): void {

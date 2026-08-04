@@ -80,13 +80,16 @@ export class TypeormTaskRepository implements TaskRepository {
   }
 
   async listBoard(projectId: string, opts: { status?: TaskStatus; cursor?: string; limit?: number } = {}): Promise<Task[]> {
+    // Newest first (created_at, then uuidv7 id as tie-breaker).
     const qb = this.ds
       .getRepository(TaskEntity)
       .createQueryBuilder('t')
       .where('t.project_id = :projectId', { projectId })
-      .orderBy('t.id', 'DESC')
+      .orderBy('t.created_at', 'DESC')
+      .addOrderBy('t.id', 'DESC')
       .limit(Math.min(opts.limit ?? 50, 200));
     if (opts.status) qb.andWhere('t.status = :status', { status: opts.status });
+    // Keyset on id remains valid for uuidv7 (time-ordered) when paging newest→oldest.
     if (opts.cursor) qb.andWhere('t.id < :cursor', { cursor: opts.cursor });
     const rows = await qb.getMany();
     return rows.map(taskToDomain);

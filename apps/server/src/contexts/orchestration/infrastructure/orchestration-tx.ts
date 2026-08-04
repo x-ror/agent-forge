@@ -99,9 +99,12 @@ class EmTickOps implements TickOps {
     ]);
   }
 
-  async setFlowStatus(status: FlowStatus, finishedAt?: Date): Promise<void> {
-    await this.em.getRepository(FlowRunEntity).update({ id: this.tickState.flow.id }, { status, ...(finishedAt ? { finishedAt } : {}) });
+  async setFlowStatus(status: FlowStatus, finishedAt?: Date | null): Promise<void> {
+    const patch: { status: FlowStatus; finishedAt?: Date | null } = { status };
+    if (finishedAt !== undefined) patch.finishedAt = finishedAt;
+    await this.em.getRepository(FlowRunEntity).update({ id: this.tickState.flow.id }, patch);
     this.tickState.flow.status = status;
+    if (finishedAt !== undefined) this.tickState.flow.finishedAt = finishedAt;
     await this.appendOutbox([
       {
         aggregateType: 'flow_run',

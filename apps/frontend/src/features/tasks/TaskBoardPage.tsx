@@ -8,18 +8,22 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableExpandedRow,
+  TableExpandHeader,
+  TableExpandRow,
   TableHead,
   TableHeader,
   TableRow,
   TableToolbar,
   TableToolbarContent,
+  Tag,
   TextArea,
   TextInput,
   Tile,
 } from '@carbon/react';
 import { Add, Play, Renew } from '@carbon/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { TaskDto } from '@agentforge/core';
 import { useCreateTask, useStartFlow, useSyncTaskSource, useTaskBoard, useTaskSources, useWorkflows } from '../../api/hooks';
@@ -27,6 +31,7 @@ import { useSse } from '../../api/sse';
 import { useAppState } from '../../state/app-state';
 import { StatusTag } from '../../components/StatusTag';
 import { formatDateTime } from '../../components/format';
+import { buildTaskTree } from './task-tree';
 
 const HEADERS = [
   { key: 'title', header: 'Task' },
@@ -92,6 +97,62 @@ function NewTaskModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function TaskTitleCell({ task, isEpic, childCount }: { task: TaskDto; isEpic?: boolean; childCount?: number }) {
+  return (
+    <span className={`af-task-title${isEpic ? ' af-task-title--epic' : ''}`}>
+      {isEpic && (
+        <Tag type="purple" size="sm" className="af-task-title__epic-tag">
+          epic
+        </Tag>
+      )}
+      <span className="af-task-title__text">{task.title}</span>
+      {isEpic && childCount != null && childCount > 0 && (
+        <span className="af-task-title__count">
+          {childCount} task{childCount === 1 ? '' : 's'}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function TaskActions({ task, onStart }: { task: TaskDto; onStart: (t: TaskDto) => void }) {
+  // Epics are containers — start workflows on leaf tasks.
+  if (task.meta?.role === 'epic') return null;
+  if (task.status !== 'backlog') return null;
+  return (
+    <Button kind="tertiary" size="sm" renderIcon={Play} onClick={() => onStart(task)}>
+      Start workflow
+    </Button>
+  );
+}
+
+function NestedTasksTable({ tasks, onStart }: { tasks: TaskDto[]; onStart: (t: TaskDto) => void }) {
+  return (
+    <div className="af-task-nested">
+      <table className="af-task-nested__table">
+        <tbody>
+          {tasks.map((child) => (
+            <tr key={child.id} className="af-task-nested__row">
+              <td className="af-task-nested__title">
+                <span className="af-task-nested__indent" aria-hidden />
+                {child.title}
+              </td>
+              <td>
+                <StatusTag status={child.status} />
+              </td>
+              <td className="af-cell--nowrap">{child.externalKey ?? 'manual'}</td>
+              <td className="af-cell--nowrap">{formatDateTime(child.updatedAt)}</td>
+              <td className="af-task-nested__actions">
+                <TaskActions task={child} onStart={onStart} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function TaskBoardPage() {
   const { projectId } = useAppState();
   const board = useTaskBoard(projectId);
@@ -100,12 +161,26 @@ export function TaskBoardPage() {
   const qc = useQueryClient();
   const [startFor, setStartFor] = useState<TaskDto | null>(null);
   const [newTask, setNewTask] = useState(false);
+  // Epics with children start expanded so nested work is visible without a click.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [expandedSeeded, setExpandedSeeded] = useState(false);
 
   // Board wake-ups: task.synced / task.status_changed → refetch (§10.3).
   useSse(projectId ? `/api/v1/tasks/stream/${projectId}` : null, {
     onMessage: () => void qc.invalidateQueries({ queryKey: ['tasks', projectId] }),
     onConnect: () => void qc.invalidateQueries({ queryKey: ['tasks', projectId] }),
   });
+
+  const tree = useMemo(() => buildTaskTree(board.data?.tasks ?? []), [board.data?.tasks]);
+
+  // Seed expansion once we have nodes with children (later re-sync keeps user toggles).
+  useEffect(() => {
+    if (expandedSeeded) return;
+    const withKids = tree.filter((n) => n.children.length > 0).map((n) => n.task.id);
+    if (withKids.length === 0) return;
+    setExpanded(new Set(withKids));
+    setExpandedSeeded(true);
+  }, [tree, expandedSeeded]);
 
   if (!projectId) {
     return (
@@ -116,20 +191,30 @@ export function TaskBoardPage() {
     );
   }
 
-  const rows = (board.data?.tasks ?? []).map((task) => ({
-    id: task.id,
-    title: task.title,
-    status: task.status,
-    externalKey: task.externalKey ?? 'manual',
-    updatedAt: formatDateTime(task.updatedAt),
+  const rows = tree.map((node) => ({
+    id: node.task.id,
+    title: node.task.title,
+    status: node.task.status,
+    externalKey: node.task.externalKey ?? 'manual',
+    updatedAt: formatDateTime(node.task.updatedAt),
   }));
-  const byId = new Map((board.data?.tasks ?? []).map((t) => [t.id, t]));
+  const nodeById = new Map(tree.map((n) => [n.task.id, n]));
+  const hasAnyEpic = tree.some((n) => n.isEpic);
+
+  const toggleExpand = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <>
       <DataTable rows={rows} headers={HEADERS}>
         {({ rows: renderRows, headers, getHeaderProps, getRowProps, getTableProps }) => (
-          <TableContainer title="Task Board" description="Synced and manual tasks for this project">
+          <TableContainer title="Task Board" description="Synced and manual tasks for this project — epics expand to show nested work">
             <TableToolbar>
               <TableToolbarContent>
                 {(sources.data ?? []).map((source) => (
@@ -145,6 +230,7 @@ export function TaskBoardPage() {
             <Table {...getTableProps()}>
               <TableHead>
                 <TableRow>
+                  {hasAnyEpic && <TableExpandHeader enableToggle={false} />}
                   {headers.map((header) => (
                     <TableHeader {...getHeaderProps({ header })} key={header.key}>
                       {header.header}
@@ -154,21 +240,58 @@ export function TaskBoardPage() {
               </TableHead>
               <TableBody>
                 {renderRows.map((row) => {
-                  const task = byId.get(row.id)!;
+                  const node = nodeById.get(row.id);
+                  if (!node) return null;
+                  const task = node.task;
+                  const isOpen = expanded.has(task.id);
+                  const canExpand = node.children.length > 0;
+                  // Carbon's getRowProps is generic over the row shape; we only need the spread props.
+                  const rowProps = getRowProps({ row });
+
+                  if (canExpand) {
+                    return (
+                      <Fragment key={row.id}>
+                        <TableExpandRow
+                          {...rowProps}
+                          aria-label={isOpen ? `Collapse ${task.title}` : `Expand ${task.title}`}
+                          isExpanded={isOpen}
+                          onExpand={() => toggleExpand(task.id)}
+                          className="af-task-row--epic"
+                        >
+                          <TableCell>
+                            <TaskTitleCell task={task} isEpic childCount={node.children.length} />
+                          </TableCell>
+                          <TableCell>
+                            <StatusTag status={task.status} />
+                          </TableCell>
+                          <TableCell>{task.externalKey ?? 'manual'}</TableCell>
+                          <TableCell className="af-cell--nowrap">{formatDateTime(task.updatedAt)}</TableCell>
+                          <TableCell>
+                            <TaskActions task={task} onStart={setStartFor} />
+                          </TableCell>
+                        </TableExpandRow>
+                        {isOpen && (
+                          <TableExpandedRow colSpan={HEADERS.length + 1} className="af-task-expanded">
+                            <NestedTasksTable tasks={node.children} onStart={setStartFor} />
+                          </TableExpandedRow>
+                        )}
+                      </Fragment>
+                    );
+                  }
+
                   return (
-                    <TableRow {...getRowProps({ row })} key={row.id}>
-                      <TableCell>{task.title}</TableCell>
+                    <TableRow {...rowProps} key={row.id} className={node.isEpic ? 'af-task-row--epic' : undefined}>
+                      {hasAnyEpic && <TableCell className="cds--table-expand" />}
+                      <TableCell>
+                        <TaskTitleCell task={task} isEpic={node.isEpic} />
+                      </TableCell>
                       <TableCell>
                         <StatusTag status={task.status} />
                       </TableCell>
                       <TableCell>{task.externalKey ?? 'manual'}</TableCell>
                       <TableCell className="af-cell--nowrap">{formatDateTime(task.updatedAt)}</TableCell>
                       <TableCell>
-                        {task.status === 'backlog' && (
-                          <Button kind="tertiary" size="sm" renderIcon={Play} onClick={() => setStartFor(task)}>
-                            Start workflow
-                          </Button>
-                        )}
+                        <TaskActions task={task} onStart={setStartFor} />
                       </TableCell>
                     </TableRow>
                   );
@@ -178,7 +301,7 @@ export function TaskBoardPage() {
             {renderRows.length === 0 && (
               <Tile className="af-empty-state">
                 <h4>No tasks yet</h4>
-                <p>Sync a task source or add a manual task to fill the board.</p>
+                <p>Sync a task source or add a manual task to fill the board. Use ## headings in TASKS.md (or GitHub sub-issues / epic labels) for nested epics.</p>
               </Tile>
             )}
           </TableContainer>

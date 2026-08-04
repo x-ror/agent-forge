@@ -14,13 +14,17 @@ import {
   StructuredListCell,
   StructuredListRow,
   StructuredListWrapper,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Tabs,
   Tag,
   TextInput,
 } from '@carbon/react';
 import { TrashCan, View } from '@carbon/icons-react';
 import { useState } from 'react';
 import type { RepoAgentDto } from '@agentforge/core';
-import { api } from '../../api/client';
 import { formatDateTime } from '../../components/format';
 import { MarkdownView } from '../../components/MarkdownView';
 import {
@@ -31,9 +35,13 @@ import {
   useCreateProject,
   useCreateTaskSource,
   useDeleteAgent,
+  useDeleteProject,
+  useDeleteSecret,
   usePats,
   useProjects,
+  usePutSecret,
   useRepoAgents,
+  useSecretKeys,
   useTaskSources,
 } from '../../api/hooks';
 import { useAppState } from '../../state/app-state';
@@ -41,21 +49,68 @@ import { useAppState } from '../../state/app-state';
 function ProjectsSection() {
   const projects = useProjects();
   const createProject = useCreateProject();
-  const { setProjectId } = useAppState();
+  const deleteProject = useDeleteProject();
+  const { projectId, setProjectId } = useAppState();
   const [name, setName] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   return (
     <Stack gap={5}>
       <StructuredListWrapper>
         <StructuredListBody>
           {(projects.data ?? []).map((project) => (
             <StructuredListRow key={project.id}>
-              <StructuredListCell>{project.name}</StructuredListCell>
+              <StructuredListCell>
+                <span className="af-settings__name-with-tag">
+                  <span className="af-settings__entity-name">{project.name}</span>
+                  {project.id === projectId ? (
+                    <Tag type="blue" size="sm">
+                      selected
+                    </Tag>
+                  ) : null}
+                </span>
+              </StructuredListCell>
               <StructuredListCell>{project.repoUrl}</StructuredListCell>
+              <StructuredListCell>
+                <Button
+                  kind="danger--ghost"
+                  size="sm"
+                  renderIcon={TrashCan}
+                  iconDescription="Delete project"
+                  hasIconOnly
+                  disabled={deleteProject.isPending}
+                  onClick={() => setPendingDelete({ id: project.id, name: project.name })}
+                />
+              </StructuredListCell>
             </StructuredListRow>
           ))}
         </StructuredListBody>
       </StructuredListWrapper>
+      {pendingDelete && (
+        <Modal
+          open
+          danger
+          modalHeading={`Delete project “${pendingDelete.name}”?`}
+          primaryButtonText="Delete"
+          secondaryButtonText="Cancel"
+          primaryButtonDisabled={deleteProject.isPending}
+          onRequestClose={() => setPendingDelete(null)}
+          onRequestSubmit={() => {
+            const id = pendingDelete.id;
+            deleteProject.mutate(id, {
+              onSuccess: () => {
+                if (projectId === id) setProjectId(null);
+                setPendingDelete(null);
+              },
+            });
+          }}
+        >
+          <p>
+            This removes the project record and its secrets/task sources from the database. Workflows and tasks that reference it may fail or be cascade-deleted depending on
+            schema. Mirrors on disk are not cleaned automatically.
+          </p>
+        </Modal>
+      )}
       <Form
         aria-label="new project"
         onSubmit={(e) => {
@@ -99,6 +154,19 @@ function AgentsSection() {
   const [importFrom, setImportFrom] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Headless claude-code denies every Edit/write-Bash without this — a run
+  // that can only read is the trap, so prefill (visibly, still editable).
+  const CLAUDE_CODE_DEFAULT_OPTIONS = JSON.stringify({ extraArgs: ['--permission-mode', 'acceptEdits'] });
+
+  const chooseAdapter = (adapterId: string) => {
+    setAdapter(adapterId);
+    if (adapterId === 'claude-code' && !optionsJson.trim()) {
+      setOptionsJson(CLAUDE_CODE_DEFAULT_OPTIONS);
+    } else if (adapterId !== 'claude-code' && optionsJson === CLAUDE_CODE_DEFAULT_OPTIONS) {
+      setOptionsJson('');
+    }
+  };
+
   const applyRepoImport = (repoName: string) => {
     setImportFrom(repoName);
     if (!repoName) {
@@ -111,9 +179,9 @@ function AgentsSection() {
     setSystemPrompt(repo.description);
     // Decision-style roles need structured output → api-loop; implementers often use claude-code.
     if (repo.kind === 'specialist' || /review|triage|critic|gate|planner/i.test(repo.name)) {
-      setAdapter('api-loop');
+      chooseAdapter('api-loop');
     } else if ((adapters.data ?? []).some((a) => a.id === 'claude-code')) {
-      setAdapter('claude-code');
+      chooseAdapter('claude-code');
     }
   };
 
@@ -194,7 +262,7 @@ function AgentsSection() {
             </Select>
           )}
           <TextInput id="agent-name" labelText="Agent name (referenced by workflows)" value={name} onChange={(e) => setName(e.target.value)} required />
-          <Select id="agent-adapter" labelText="Adapter" value={adapter} onChange={(e) => setAdapter(e.target.value)}>
+          <Select id="agent-adapter" labelText="Adapter" value={adapter} onChange={(e) => chooseAdapter(e.target.value)}>
             {(adapters.data ?? []).map((item) => (
               <SelectItem key={item.id} value={item.id} text={item.id} />
             ))}
@@ -263,31 +331,90 @@ function SourcesSection() {
 
 function SecretsSection() {
   const { projectId } = useAppState();
+  const secretKeys = useSecretKeys(projectId);
+  const putSecret = usePutSecret(projectId);
+  const deleteSecret = useDeleteSecret(projectId);
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
   const [saved, setSaved] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   if (!projectId) return <p>Select a project first.</p>;
+  const keys = secretKeys.data?.keys ?? [];
   return (
-    <Form
-      aria-label="put secret"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void api.put(`/projects/${projectId}/secrets/${key}`, { value }).then(() => {
-          setSaved(key);
-          setKey('');
-          setValue('');
-        });
-      }}
-    >
-      <Stack gap={4}>
-        {saved && <InlineNotification kind="success" lowContrast title={`Secret ${saved} stored`} subtitle="Values are write-only." onClose={() => setSaved(null)} />}
-        <TextInput id="secret-key" labelText="Key (UPPER_SNAKE_CASE, e.g. GITHUB_TOKEN)" value={key} onChange={(e) => setKey(e.target.value)} required />
-        <TextInput id="secret-value" labelText="Value" type="password" value={value} onChange={(e) => setValue(e.target.value)} required />
-        <Button type="submit" size="sm">
-          Store secret
-        </Button>
-      </Stack>
-    </Form>
+    <Stack gap={5}>
+      <p className="af-settings__tab-desc">Values are write-only: they are passed to agent runs but can never be read back here. Storing an existing key overwrites it.</p>
+      {secretKeys.isLoading ? (
+        <InlineLoading description="Loading secrets…" />
+      ) : keys.length === 0 ? (
+        <p className="af-empty-state">No secrets stored for this project.</p>
+      ) : (
+        <StructuredListWrapper>
+          <StructuredListBody>
+            {keys.map((k) => (
+              <StructuredListRow key={k}>
+                <StructuredListCell>
+                  <code>{k}</code>
+                </StructuredListCell>
+                <StructuredListCell>••••••••</StructuredListCell>
+                <StructuredListCell>
+                  <Button
+                    kind="danger--ghost"
+                    size="sm"
+                    renderIcon={TrashCan}
+                    iconDescription={`Delete ${k}`}
+                    hasIconOnly
+                    disabled={deleteSecret.isPending}
+                    onClick={() => setPendingDelete(k)}
+                  />
+                </StructuredListCell>
+              </StructuredListRow>
+            ))}
+          </StructuredListBody>
+        </StructuredListWrapper>
+      )}
+      {pendingDelete && (
+        <Modal
+          open
+          danger
+          modalHeading={`Delete secret ${pendingDelete}?`}
+          primaryButtonText="Delete"
+          secondaryButtonText="Cancel"
+          primaryButtonDisabled={deleteSecret.isPending}
+          onRequestClose={() => setPendingDelete(null)}
+          onRequestSubmit={() => {
+            deleteSecret.mutate(pendingDelete, { onSuccess: () => setPendingDelete(null) });
+          }}
+        >
+          <p>Agent runs on this project will no longer receive {pendingDelete} in their environment.</p>
+        </Modal>
+      )}
+      <Form
+        aria-label="put secret"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const storedKey = key;
+          putSecret.mutate(
+            { key, value },
+            {
+              onSuccess: () => {
+                setSaved(storedKey);
+                setKey('');
+                setValue('');
+              },
+            },
+          );
+        }}
+      >
+        <Stack gap={4}>
+          {saved && <InlineNotification kind="success" lowContrast title={`Secret ${saved} stored`} subtitle="Values are write-only." onClose={() => setSaved(null)} />}
+          <TextInput id="secret-key" labelText="Key (UPPER_SNAKE_CASE, e.g. GITHUB_TOKEN)" value={key} onChange={(e) => setKey(e.target.value)} required />
+          <TextInput id="secret-value" labelText="Value" type="password" value={value} onChange={(e) => setValue(e.target.value)} required />
+          <Button type="submit" size="sm" disabled={putSecret.isPending}>
+            Store secret
+          </Button>
+        </Stack>
+      </Form>
+    </Stack>
   );
 }
 
@@ -370,8 +497,16 @@ function RepoAgentsSection() {
                 <div className="af-repo-agent__role">{agent.role}</div>
               </StructuredListCell>
               <StructuredListCell>
-                <Tag type={agent.kind === 'agent' ? 'blue' : 'purple'}>{agent.kind}</Tag>
-                {registeredNames.has(agent.name) ? <Tag type="green">registered</Tag> : null}
+                <span className="af-settings__tag-row">
+                  <Tag type={agent.kind === 'agent' ? 'blue' : 'purple'} size="sm">
+                    {agent.kind}
+                  </Tag>
+                  {registeredNames.has(agent.name) ? (
+                    <Tag type="green" size="sm">
+                      registered
+                    </Tag>
+                  ) : null}
+                </span>
               </StructuredListCell>
               <StructuredListCell className="af-cell--nowrap">{agent.provider ?? '—'}</StructuredListCell>
               <StructuredListCell>
@@ -477,29 +612,69 @@ function PatsSection() {
 }
 
 export function SettingsPage() {
+  const { projectId } = useAppState();
+  const projects = useProjects();
+  const selectedName = (projects.data ?? []).find((p) => p.id === projectId)?.name;
+
   return (
-    <div>
-      <h3>Settings</h3>
-      <Accordion align="start">
-        <AccordionItem title="Projects" open>
-          <ProjectsSection />
-        </AccordionItem>
-        <AccordionItem title="Agents">
-          <AgentsSection />
-        </AccordionItem>
-        <AccordionItem title="Repo agents (from project registry)">
-          <RepoAgentsSection />
-        </AccordionItem>
-        <AccordionItem title="Task sources">
-          <SourcesSection />
-        </AccordionItem>
-        <AccordionItem title="Secrets (write-only)">
-          <SecretsSection />
-        </AccordionItem>
-        <AccordionItem title="Personal access tokens">
-          <PatsSection />
-        </AccordionItem>
-      </Accordion>
+    <div className="af-settings">
+      <h3 className="af-settings__page-title">Settings</h3>
+      <p className="af-settings__lede">
+        <strong>Account</strong> is global for your user. <strong>Project</strong> applies only to the project selected in the header
+        {selectedName ? (
+          <>
+            {' '}
+            (<strong>{selectedName}</strong>)
+          </>
+        ) : null}
+        .
+      </p>
+
+      <Tabs>
+        <TabList aria-label="Settings scope">
+          <Tab>Account (global)</Tab>
+          <Tab>Project{selectedName ? `: ${selectedName}` : ''}</Tab>
+        </TabList>
+        <TabPanels>
+          <TabPanel>
+            <p className="af-settings__tab-desc">Shared across all projects: project list, runtime agents, and PATs.</p>
+            <Accordion align="start">
+              <AccordionItem title="Projects" open>
+                <ProjectsSection />
+              </AccordionItem>
+              <AccordionItem title="Runtime agents">
+                <AgentsSection />
+              </AccordionItem>
+              <AccordionItem title="Personal access tokens">
+                <PatsSection />
+              </AccordionItem>
+            </Accordion>
+          </TabPanel>
+          <TabPanel>
+            <p className="af-settings__tab-desc">Secrets, task sources, and the in-repo agent catalog for the currently selected project.</p>
+            {!projectId ? (
+              <InlineNotification
+                kind="info"
+                lowContrast
+                hideCloseButton
+                title="Select a project"
+                subtitle="Use the project picker in the top bar, or create one under Account → Projects."
+              />
+            ) : null}
+            <Accordion align="start">
+              <AccordionItem title="Secrets" open={!!projectId}>
+                <SecretsSection />
+              </AccordionItem>
+              <AccordionItem title="Task sources">
+                <SourcesSection />
+              </AccordionItem>
+              <AccordionItem title="Repo agents (from registry)">
+                <RepoAgentsSection />
+              </AccordionItem>
+            </Accordion>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </div>
   );
 }

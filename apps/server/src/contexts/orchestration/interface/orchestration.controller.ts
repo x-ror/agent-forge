@@ -130,6 +130,22 @@ export class FlowRunsController {
     return { ok: true };
   }
 
+  /** Re-open a failed flow and re-tick from failed nodes (keeps succeeded steps / worktree). */
+  @Post(':id/resume')
+  async resume(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<FlowRunDto> {
+    const flowRun = await this.flowRuns.resume(user.userId, id);
+    const steps = (await this.flowRuns.detail(user.userId, id)).steps;
+    return flowToDto(flowRun, steps);
+  }
+
+  /** Cancel session, delete worktree, return task to backlog (fresh Start workflow). */
+  @Post(':id/abandon')
+  async abandon(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<FlowRunDto> {
+    const flowRun = await this.flowRuns.abandon(user.userId, id);
+    const steps = (await this.flowRuns.detail(user.userId, id)).steps;
+    return flowToDto(flowRun, steps);
+  }
+
   /** Cumulative flow diff = latest diff artifact among the flow's runs (§9). */
   @Get(':id/diff')
   async diff(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<{ diff: string; baseRef: string | null }> {

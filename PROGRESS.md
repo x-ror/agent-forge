@@ -270,3 +270,17 @@ Running log per implementation-cycle prompt. Newest phase last.
 4. **nginx 502 after `up -d api`** — static `proxy_pass` pinned the api container IP at startup. Fix: `resolver 127.0.0.11` + variable `proxy_pass`, re-resolving per request (verified: api force-recreated, proxy stays 200 with no frontend restart).
 
 **Remaining gaps:** the *canonical multi-agent workflow* (implement → triage → review → PR) against a real LLM still needs an `ANTHROPIC_API_KEY` for the api-loop agents (console key; OAuth tokens don't work on `x-api-key`) — the claude-code path above proves the runtime end-to-end. `llm-only` network policy and the dump/restore drill remain as before.
+
+---
+
+## Post-ship — frontend polish, tenancy fix, secrets management UI (done)
+
+**Screenshot-driven UI fixes** (from `screenshots/1-3.png`): the Carbon `Theme` wrapper now paints the full viewport (`.af-app` — kills the white/black voids around short pages and the wizard "band"; `color-scheme` follows g10/g100 so native scrollbars/inputs match); first project auto-selects after login (fresh login and stale-id cases); header project picker vertically centered; dates render via `Intl.DateTimeFormat` in nowrap cells (Flow Runs, Task Board, Settings); empty states for Flow Runs/Workflows/Task Board. Fonts audit confirmed IBM Plex was already correctly self-hosted (39 `@font-face` rules; 300/400/600 lazy-load) — no fix needed.
+
+**Access control:** `GET /flow-runs` listed every user's runs — now scoped through owned projects (`WorkflowEntity` join, empty-ownership short-circuit).
+
+**SCM base-ref fallback:** a project whose `defaultBranch` doesn't exist in the mirror (the main-vs-master trap) now falls back to the mirror's `HEAD` branch with a warning instead of failing `worktree add`; missing-and-no-HEAD still fails with git's own diagnostic (empty-repo test).
+
+**Secrets management UI:** Settings → Project → Secrets now lists stored key names (values remain write-only), with confirm-modal delete — needed in anger when a stale `ANTHROPIC_API_KEY` (an OAuth token, invalid on `x-api-key`) shadowed `CLAUDE_CODE_OAUTH_TOKEN` and broke the claude-code CLI's auth precedence. Hooks: `useSecretKeys`/`usePutSecret`/`useDeleteSecret`.
+
+**e2e hardening:** first-boot race fixed (bootstrap answer gates wizard-vs-login, with error fallback so a failed bootstrap can't spin forever); spec seeds a first user via the **isolated** `request` fixture (`page.request` shares the page's cookie jar and silently logs the browser in); `test:e2e` builds dist first so Playwright never tests a stale bundle.

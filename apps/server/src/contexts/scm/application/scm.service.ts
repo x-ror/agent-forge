@@ -83,26 +83,42 @@ export class ScmService {
   /**
    * Worktree from the mirror on a fresh branch. Reuses an existing worktree
    * (recovery/resume) instead of failing.
+   *
+   * Branch names are task-keyed (`agentforge/<externalKey>`). After Discard,
+   * orphans must be removed — if a stale worktree still holds the branch we
+   * force-remove it and retry once (common after abandon ran without the
+   * workspaces volume mounted on the API).
    */
   async createWorktree(project: Project, opts: { kind: 'run' | 'flow'; id: string; name: string; baseRef: string }): Promise<WorktreeInfo> {
     const mirror = await this.ensureMirror(project);
     const wtPath = this.worktreePath(opts.kind, opts.id);
     const branch = `agentforge/${sanitizeBranchName(opts.name)}`;
     if (existsSync(wtPath)) {
-      return { path: wtPath, branch, baseRef: opts.baseRef };
+      return { path: wtPath, branch, baseRef: await this.resolveBaseRef(mirror, opts.baseRef) };
     }
     const baseRef = await this.resolveBaseRef(mirror, opts.baseRef);
     await mkdir(path.dirname(wtPath), { recursive: true });
-    const result = await this.git.run(['-C', mirror, 'worktree', 'add', '-b', branch, wtPath, baseRef], { allowFail: true });
+
+    let result = await this.git.run(['-C', mirror, 'worktree', 'add', '-b', branch, wtPath, baseRef], { allowFail: true });
     if (result.exitCode !== 0) {
-      if (/already exists/.test(result.stderr)) {
-        // Branch left over from a previous attempt — reattach.
-        await this.git.run(['-C', mirror, 'worktree', 'add', wtPath, branch]);
-      } else {
-        // stderr in the message, not just the field — callers log String(error),
-        // and `fatal: invalid reference: <ref>` is the whole diagnosis.
-        throw new ScmError(`worktree add ${branch} from ${baseRef} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 500)}`, result.stderr);
+      const usedBy = /already used by worktree at '([^']+)'/.exec(result.stderr);
+      const branchExists = /already exists|already checked out/.test(result.stderr);
+      if (usedBy || branchExists) {
+        // Drop the orphan that still owns this branch (leftover from a previous flow).
+        if (usedBy?.[1] && usedBy[1] !== wtPath) {
+          this.logger.warn(`worktree branch ${branch} held by orphan ${usedBy[1]}; force-removing`);
+          await this.removeWorktree(project.id, usedBy[1]);
+        }
+        await this.git.run(['-C', mirror, 'branch', '-D', branch], { allowFail: true });
+        // Retry: new branch from base, or attach if branch still present.
+        result = await this.git.run(['-C', mirror, 'worktree', 'add', '-b', branch, wtPath, baseRef], { allowFail: true });
+        if (result.exitCode !== 0 && /already exists/.test(result.stderr)) {
+          result = await this.git.run(['-C', mirror, 'worktree', 'add', wtPath, branch], { allowFail: true });
+        }
       }
+    }
+    if (result.exitCode !== 0) {
+      throw new ScmError(`worktree add ${branch} from ${baseRef} failed (exit ${result.exitCode}): ${result.stderr.trim().slice(0, 500)}`, result.stderr);
     }
     return { path: wtPath, branch, baseRef };
   }
@@ -271,6 +287,21 @@ export class ScmService {
       allowFail: true,
     });
     await rm(worktree, { recursive: true, force: true });
+    // process-sandbox HOME sibling (see sandbox HOME outside worktree)
+    await rm(`${worktree}.home`, { recursive: true, force: true }).catch(() => undefined);
     await this.git.run(['-C', mirror, 'worktree', 'prune'], { allowFail: true });
+  }
+
+  /**
+   * Drop a flow session workspace: worktree dir + optional local agentforge/* branch
+   * on the mirror so a later start can recreate cleanly.
+   */
+  async abandonFlowWorkspace(projectId: string, flowRunId: string, branch?: string | null): Promise<void> {
+    const wtPath = this.worktreePath('flow', flowRunId);
+    await this.removeWorktree(projectId, wtPath);
+    if (branch) {
+      const mirror = this.mirrorPath(projectId);
+      await this.git.run(['-C', mirror, 'branch', '-D', branch], { allowFail: true });
+    }
   }
 }

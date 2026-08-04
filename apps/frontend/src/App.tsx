@@ -71,7 +71,9 @@ export default function App() {
   if (me.isError) {
     // Wait for the bootstrap answer — rendering LoginPage while it's in
     // flight flashes the wrong screen on first boot (wizard vs login race).
-    if (!bootstrap.data) {
+    // If bootstrap itself fails we fall through to LoginPage rather than
+    // spinning forever.
+    if (!bootstrap.data && !bootstrap.isError) {
       return (
         <Theme className="af-app" theme={theme}>
           <Content>
@@ -82,7 +84,7 @@ export default function App() {
     }
     return (
       <Theme className="af-app" theme={theme}>
-        {bootstrap.data.needsSetup ? <SetupWizard onDone={() => void qc.invalidateQueries()} /> : <LoginPage />}
+        {bootstrap.data?.needsSetup ? <SetupWizard onDone={() => void qc.invalidateQueries()} /> : <LoginPage />}
       </Theme>
     );
   }

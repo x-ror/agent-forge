@@ -54,14 +54,20 @@ export class FlowEngine {
     await this.expireTimedOutGates(ops, state);
 
     const effects: SideEffect[] = [];
-    const started = new Set(state.steps.map((s) => s.nodeId));
+    // Policy: agents try once. `failed` blocks re-entry until the user hits
+    // Resume (which marks those steps skipped). Never auto-retry agents.
+    const started = new Set(
+      state.steps.filter((s) => s.status === 'succeeded' || s.status === 'running' || s.status === 'awaiting_input' || s.status === 'failed').map((s) => s.nodeId),
+    );
 
     // Resolve edges to a fixpoint: immediately-completing steps (triggers,
     // rule decisions, notify) cascade within one tick.
+    // Latest non-skipped step per node drives outcomes.
     let progressed = true;
     while (progressed) {
       progressed = false;
-      for (const step of state.steps.slice()) {
+      for (const step of latestStepsByNode(state.steps)) {
+        if (step.status === 'skipped') continue;
         const outcome = stepOutcome(step);
         if (!outcome) continue;
         for (const edge of matchingEdges(state.definition, step.nodeId, outcome)) {
@@ -251,10 +257,12 @@ export class FlowEngine {
 
   private async settle(ops: TickOps, state: TickState, pendingEffects: SideEffect[]): Promise<void> {
     if (state.flow.status !== 'running') return;
-    const active = state.steps.some((s) => s.status === 'running' || s.status === 'awaiting_input');
+    // Ignore skipped (superseded by resume) when judging the flow.
+    const latest = latestStepsByNode(state.steps).filter((s) => s.status !== 'skipped');
+    const active = latest.some((s) => s.status === 'running' || s.status === 'awaiting_input');
     if (active || pendingEffects.length > 0) return;
 
-    const anyCancelled = state.steps.some((s) => s.status === 'cancelled');
+    const anyCancelled = latest.some((s) => s.status === 'cancelled');
     if (anyCancelled) {
       await ops.setFlowStatus('cancelled', new Date());
       if (state.task.status === 'in_flow') await ops.setTaskStatus('backlog');
@@ -264,8 +272,8 @@ export class FlowEngine {
     // A failed step whose failure edge was NOT handled ends the flow failed;
     // a handled failure still marks the flow (and task) failed at the end —
     // failure is a first-class, honest outcome (§7.3).
-    const anyFailed = state.steps.some((s) => s.status === 'failed');
-    const anyRejectedGate = state.steps.some((s) => s.kind === 'gate' && s.decision?.route === 'rejected');
+    const anyFailed = latest.some((s) => s.status === 'failed');
+    const anyRejectedGate = latest.some((s) => s.kind === 'gate' && s.decision?.route === 'rejected');
     if (anyFailed || anyRejectedGate) {
       await ops.setFlowStatus('failed', new Date());
       if (state.task.status === 'in_flow') await ops.setTaskStatus('failed');
@@ -369,4 +377,19 @@ export class FlowEngine {
       return [];
     });
   }
+}
+
+/** Latest step attempt per workflow node (by startedAt, then id). */
+function latestStepsByNode(steps: FlowStep[]): FlowStep[] {
+  const map = new Map<string, FlowStep>();
+  for (const step of steps) {
+    const prev = map.get(step.nodeId);
+    if (!prev) {
+      map.set(step.nodeId, step);
+      continue;
+    }
+    const t = step.startedAt.getTime() - prev.startedAt.getTime();
+    if (t > 0 || (t === 0 && step.id > prev.id)) map.set(step.nodeId, step);
+  }
+  return [...map.values()];
 }

@@ -16,12 +16,12 @@ import {
   ToggletipButton,
   ToggletipContent,
 } from '@carbon/react';
-import { CheckmarkFilled, CircleDash, ErrorFilled, InProgress, Information } from '@carbon/icons-react';
+import { CheckmarkFilled, CircleDash, ErrorFilled, InProgress, Information, Renew, TrashCan } from '@carbon/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import type { FlowStepDto } from '@agentforge/core';
-import { useFlowDiff, useFlowRun, useResolveGate } from '../../api/hooks';
+import { useAbandonFlow, useFlowDiff, useFlowRun, useResolveGate, useResumeFlow } from '../../api/hooks';
 import { useSse } from '../../api/sse';
 import { StatusTag } from '../../components/StatusTag';
 import { DiffView } from '../diff/DiffView';
@@ -76,10 +76,16 @@ export function FlowRunPage() {
   const flowRunId = id ?? null;
   const flow = useFlowRun(flowRunId);
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [gateOpen, setGateOpen] = useState(false);
   const [gateNote, setGateNote] = useState('');
+  const [abandonOpen, setAbandonOpen] = useState(false);
   const resolveGate = useResolveGate(flowRunId ?? '');
+  const resumeFlow = useResumeFlow(flowRunId ?? '');
+  const abandonFlow = useAbandonFlow(flowRunId ?? '');
   const terminal = flow.data && ['succeeded', 'failed', 'cancelled'].includes(flow.data.status);
+  // Only active or failed sessions need discard; already cancelled is done.
+  const canAbandon = flow.data && (flow.data.status === 'failed' || flow.data.status === 'running' || flow.data.status === 'awaiting_input');
   const diff = useFlowDiff(flowRunId, true);
 
   useSse(flowRunId ? `/api/v1/flow-runs/${flowRunId}/stream` : null, {
@@ -104,7 +110,40 @@ export function FlowRunPage() {
             Review gate
           </Button>
         )}
+        {flow.data.status === 'failed' && (
+          <Button
+            kind="primary"
+            size="sm"
+            renderIcon={Renew}
+            disabled={resumeFlow.isPending || abandonFlow.isPending}
+            onClick={() => resumeFlow.mutate()}
+            data-testid="resume-flow"
+            title="One retry of failed steps only; press again after another failure"
+          >
+            {resumeFlow.isPending ? 'Retrying…' : 'Retry once'}
+          </Button>
+        )}
+        {canAbandon && (
+          <Button
+            kind="danger"
+            size="sm"
+            renderIcon={TrashCan}
+            disabled={abandonFlow.isPending || resumeFlow.isPending}
+            onClick={() => setAbandonOpen(true)}
+            data-testid="abandon-flow"
+          >
+            Discard session
+          </Button>
+        )}
       </div>
+      {flow.data.status === 'failed' && (
+        <p className="af-repo-agent__role">
+          <strong>Retry once</strong> — re-run failed steps (keeps worktree). <strong>Discard session</strong> — delete worktree, cancel flow, return task to backlog so you can
+          Start workflow again.
+        </p>
+      )}
+      {resumeFlow.isError && <p className="af-repo-agent__role">Retry failed: {resumeFlow.error instanceof Error ? resumeFlow.error.message : 'unknown error'}</p>}
+      {abandonFlow.isError && <p className="af-repo-agent__role">Discard failed: {abandonFlow.error instanceof Error ? abandonFlow.error.message : 'unknown error'}</p>}
 
       <Tabs>
         <TabList aria-label="Flow views">
@@ -157,6 +196,31 @@ export function FlowRunPage() {
         >
           <p>The flow is paused awaiting your decision.</p>
           <TextInput id="gate-note" labelText="Note (stored as reasoning)" value={gateNote} onChange={(e) => setGateNote(e.target.value)} />
+        </Modal>
+      )}
+
+      {abandonOpen && (
+        <Modal
+          open
+          danger
+          modalHeading="Discard this session?"
+          primaryButtonText="Discard"
+          secondaryButtonText="Cancel"
+          primaryButtonDisabled={abandonFlow.isPending}
+          onRequestClose={() => setAbandonOpen(false)}
+          onRequestSubmit={() =>
+            abandonFlow.mutate(undefined, {
+              onSuccess: () => {
+                setAbandonOpen(false);
+                void navigate('/');
+              },
+            })
+          }
+        >
+          <p>
+            This cancels the flow, deletes its worktree (and local agentforge branch), and returns the task to <strong>backlog</strong> so you can Start workflow again on the same
+            issue.
+          </p>
         </Modal>
       )}
     </div>

@@ -22,11 +22,21 @@ describe('FlowRun state machine (§3.1)', () => {
     expect(() => flow.succeed()).toThrow(IllegalFlowTransitionError);
   });
 
-  it('terminal states are final', () => {
+  it('succeeded is final; failed can resume or cancel (abandon)', () => {
     const flow = freshFlow();
-    flow.fail();
+    flow.succeed();
     expect(() => flow.resume()).toThrow(IllegalFlowTransitionError);
-    expect(() => flow.cancel()).toThrow(IllegalFlowTransitionError);
+
+    const failed = freshFlow();
+    failed.fail();
+    failed.reopenForResume();
+    expect(failed.status).toBe('running');
+    expect(failed.finishedAt).toBeNull();
+
+    const abandon = freshFlow();
+    abandon.fail();
+    abandon.cancel();
+    expect(abandon.status).toBe('cancelled');
   });
 
   it('context accumulates via merge', () => {

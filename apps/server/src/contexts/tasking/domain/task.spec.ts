@@ -8,9 +8,10 @@ describe('Task lifecycle (§3.1)', () => {
     assertTaskTransition('done', 'archived');
   });
 
-  it('allows failed → backlog retry', () => {
+  it('allows failed → backlog or in_flow (resume)', () => {
     assertTaskTransition('in_flow', 'failed');
     assertTaskTransition('failed', 'backlog');
+    assertTaskTransition('failed', 'in_flow');
   });
 
   it('rejects nonsense moves', () => {

@@ -37,6 +37,11 @@ services:
       AGENTFORGE_BASE_URL: http://localhost:3000
       WORKSPACES_DIR: /data/workspaces
       ARTIFACTS_DIR: /data/artifacts
+    volumes:
+      # Needed so Discard session (abandon) can remove flow worktrees from the API process.
+      # Worker still owns create/push; api only cleans up on abandon.
+      - workspaces:/data/workspaces
+      - artifacts:/data/artifacts
     depends_on:
       postgres:
         condition: service_healthy

@@ -48,6 +48,68 @@
   padding: 2rem;
 }
 
+/* ---- task board: epic hierarchy ---- */
+.af-task-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.af-task-title--epic .af-task-title__text {
+  font-weight: 600;
+}
+
+.af-task-title__count {
+  color: var(--cds-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.af-task-title__epic-tag {
+  margin: 0; /* Tag has its own spacing; flex gap handles layout */
+}
+
+.af-task-expanded td {
+  padding: 0 !important;
+  background: var(--cds-layer-01);
+}
+
+.af-task-nested {
+  padding: 0 0 0.5rem 0;
+}
+
+.af-task-nested__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.af-task-nested__row td {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--cds-border-subtle-01);
+  vertical-align: middle;
+  font-size: 0.875rem;
+}
+
+.af-task-nested__title {
+  width: 36%;
+}
+
+.af-task-nested__indent {
+  display: inline-block;
+  width: 1.25rem;
+  margin-right: 0.25rem;
+  border-left: 2px solid var(--cds-border-interactive);
+  height: 0.75rem;
+  vertical-align: middle;
+}
+
+.af-task-nested__actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
 .af-empty-state p {
   margin-top: 0.5rem;
   color: var(--cds-text-secondary);
@@ -63,6 +125,43 @@
   display: flex;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+/* ---- settings: account vs project tabs ---- */
+.af-settings__page-title {
+  margin: 0 0 0.5rem;
+}
+
+.af-settings__lede {
+  margin: 0 0 1.25rem;
+  max-width: 48rem;
+  color: var(--cds-text-secondary);
+}
+
+.af-settings__tab-desc {
+  margin: 0.75rem 0 1rem;
+  color: var(--cds-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Space Carbon tags away from labels / neighboring tags */
+.af-settings__name-with-tag {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.af-settings__entity-name {
+  line-height: 1.5rem; /* match default tag height for vertical align */
+}
+
+.af-settings__tag-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
 }
 
 /* ---- markdown (pretty agent / prompt view) ---- */

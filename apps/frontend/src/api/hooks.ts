@@ -64,6 +64,46 @@ export function useCreateProject() {
   });
 }
 
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/projects/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['projects'] });
+      void qc.invalidateQueries({ queryKey: ['tasks'] });
+      void qc.invalidateQueries({ queryKey: ['task-sources'] });
+      void qc.invalidateQueries({ queryKey: ['workflows'] });
+      void qc.invalidateQueries({ queryKey: ['repo-agents'] });
+    },
+  });
+}
+
+// ---- secrets (values are write-only; only key names ever come back) --------
+
+export function useSecretKeys(projectId: string | null) {
+  return useQuery({
+    queryKey: ['secrets', projectId],
+    enabled: !!projectId,
+    queryFn: () => api.get<{ keys: string[] }>(`/projects/${projectId}/secrets`),
+  });
+}
+
+export function usePutSecret(projectId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { key: string; value: string }) => api.put<void>(`/projects/${projectId}/secrets/${encodeURIComponent(args.key)}`, { value: args.value }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['secrets', projectId] }),
+  });
+}
+
+export function useDeleteSecret(projectId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => api.delete<void>(`/projects/${projectId}/secrets/${encodeURIComponent(key)}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['secrets', projectId] }),
+  });
+}
+
 /** In-repo agent registry (config/agents.json) with full prompt bodies. */
 export function useRepoAgents(projectId: string | null) {
   return useQuery({
@@ -205,6 +245,30 @@ export function useResolveGate(flowRunId: string) {
   return useMutation({
     mutationFn: (body: { approve: boolean; note?: string }) => api.post(`/flow-runs/${flowRunId}/gate`, body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['flow-run', flowRunId] }),
+  });
+}
+
+export function useResumeFlow(flowRunId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<FlowRunDto>(`/flow-runs/${flowRunId}/resume`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['flow-run', flowRunId] });
+      void qc.invalidateQueries({ queryKey: ['flow-runs'] });
+      void qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+export function useAbandonFlow(flowRunId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<FlowRunDto>(`/flow-runs/${flowRunId}/abandon`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['flow-run', flowRunId] });
+      void qc.invalidateQueries({ queryKey: ['flow-runs'] });
+      void qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
   });
 }
 

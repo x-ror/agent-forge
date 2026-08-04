@@ -1,7 +1,8 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventTypes } from '../../../shared/outbox/integration-event';
 import { uuidv7 } from '../../../shared/uuidv7';
 import { ProjectsService } from '../../projects/application/projects.service';
+import { ScmService } from '../../scm/application/scm.service';
 import { TasksService } from '../../tasking/application/tasks.service';
 import { FlowRun } from '../domain/flow-run';
 import type { FlowStep } from '../domain/flow-step';
@@ -10,6 +11,8 @@ import { ORCHESTRATION_TX, type OrchestrationTxPort } from '../domain/ports';
 
 @Injectable()
 export class FlowRunsService {
+  private readonly logger = new Logger(FlowRunsService.name);
+
   constructor(
     @Inject(FLOW_RUN_REPOSITORY) private readonly flowRuns: FlowRunRepository,
     @Inject(FLOW_STEP_REPOSITORY) private readonly steps: FlowStepRepository,
@@ -17,6 +20,7 @@ export class FlowRunsService {
     @Inject(ORCHESTRATION_TX) private readonly otx: OrchestrationTxPort,
     private readonly projects: ProjectsService,
     private readonly tasks: TasksService,
+    private readonly scm: ScmService,
   ) {}
 
   /**
@@ -116,5 +120,112 @@ export class FlowRunsService {
       return true;
     });
     if (!resolved) throw new BadRequestException('no gate awaiting approval on this flow');
+  }
+
+  /**
+   * Manual single retry of a failed flow (no automatic agent re-runs).
+   * Succeeded steps stay (e.g. worktree). Latest failed steps → skipped, then
+   * one re-entry of those nodes. If they fail again the flow stops until the
+   * user clicks Retry again.
+   */
+  async resume(userId: string, flowRunId: string): Promise<FlowRun> {
+    await this.getAccessible(userId, flowRunId);
+    const ok = await this.otx.withFlowTick(flowRunId, async (ops) => {
+      const state = ops.state();
+      if (state.flow.status !== 'failed') return false;
+
+      // Supersede failed attempts so they no longer block re-entry or settle.
+      const latestByNode = new Map<string, (typeof state.steps)[number]>();
+      for (const step of state.steps) {
+        const prev = latestByNode.get(step.nodeId);
+        if (!prev || step.startedAt >= prev.startedAt) latestByNode.set(step.nodeId, step);
+      }
+      for (const step of latestByNode.values()) {
+        if (step.status === 'failed') {
+          await ops.completeStep(step.id, 'skipped', {
+            decision: { route: 'resumed', reasoning: 'superseded by user resume' },
+          });
+        }
+      }
+
+      await ops.setFlowStatus('running', null);
+      if (state.task.status === 'failed' || state.task.status === 'backlog') {
+        await ops.setTaskStatus('in_flow');
+      }
+      await ops.appendOutbox([
+        {
+          aggregateType: 'flow_run',
+          aggregateId: flowRunId,
+          eventType: EventTypes.FlowAdvanceRequested,
+          payload: { reason: 'resume_after_failure' },
+        },
+      ]);
+      return true;
+    });
+    if (!ok) throw new BadRequestException('only failed flows can be resumed');
+    const flow = await this.flowRuns.findById(flowRunId);
+    if (!flow) throw new NotFoundException('flow run not found');
+    return flow;
+  }
+
+  /**
+   * Discard a flow session: cancel the flow, return the task to backlog, and
+   * delete the flow worktree (+ local agentforge branch) so Start workflow can
+   * run cleanly on the same issue again.
+   */
+  async abandon(userId: string, flowRunId: string): Promise<FlowRun> {
+    await this.getAccessible(userId, flowRunId);
+
+    const workspace = await this.otx.withFlowTick(flowRunId, async (ops) => {
+      const state = ops.state();
+      if (state.flow.status === 'succeeded') {
+        throw new BadRequestException('cannot abandon a succeeded flow');
+      }
+
+      // Cancel any still-active steps so the timeline reflects discard.
+      for (const step of state.steps) {
+        if (step.status === 'running' || step.status === 'awaiting_input') {
+          await ops.completeStep(step.id, 'cancelled', {
+            decision: { route: 'abandoned', reasoning: 'session discarded by user' },
+          });
+        }
+      }
+
+      if (state.flow.status === 'running' || state.flow.status === 'awaiting_input' || state.flow.status === 'failed') {
+        await ops.setFlowStatus('cancelled', new Date());
+      }
+      // already cancelled: still clean workspace + force task backlog below
+
+      if (state.task.status === 'in_flow' || state.task.status === 'failed') {
+        await ops.setTaskStatus('backlog');
+      }
+
+      await ops.appendOutbox([
+        {
+          aggregateType: 'flow_run',
+          aggregateId: flowRunId,
+          eventType: EventTypes.FlowStatusChanged,
+          payload: { status: 'cancelled', reason: 'abandoned', taskId: state.task.id },
+        },
+      ]);
+
+      const wt = state.flow.context.worktree as { path?: string; branch?: string } | undefined;
+      return {
+        projectId: state.projectId,
+        branch: wt?.branch ?? null,
+      };
+    });
+
+    if (!workspace) throw new NotFoundException('flow run not found');
+
+    try {
+      await this.scm.abandonFlowWorkspace(workspace.projectId, flowRunId, workspace.branch);
+    } catch (error) {
+      this.logger.warn(`abandon worktree cleanup for ${flowRunId}: ${String(error).slice(0, 300)}`);
+    }
+
+    const flow = await this.flowRuns.findById(flowRunId);
+    if (!flow) throw new NotFoundException('flow run not found');
+    return flow;
   }
 }
