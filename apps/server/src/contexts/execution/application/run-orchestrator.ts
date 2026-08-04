@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { agentEventSchema, type AgentAdapter, type AgentHandle, type AgentEvent, type Json, type RunContext } from '@agentforge/core';
 import { APP_ENV, type AppEnv } from '../../../config/env';
 import { EventTypes, type IntegrationEvent } from '../../../shared/outbox/integration-event';
+import { redactSecrets } from '../../../shared/redaction';
 import { AdapterRegistry } from '../../agent-registry/application/adapter-registry';
 import { ScmService } from '../../scm/application/scm.service';
 import { AGENT_REPOSITORY, type AgentRepository } from '../../agent-registry/domain/agent';
@@ -162,7 +163,7 @@ export class RunOrchestrator {
         await this.tx.saveRunAndEvents(run, [{ type: 'orchestrator.status', payload: { status: 'running' } }]);
       }
 
-      const outcome = await this.pump(run, handle);
+      const outcome = await this.pump(run, handle, Object.values(env));
       await this.finish(run, outcome);
     } catch (error) {
       await this.failSafely(run, String(error));
@@ -172,7 +173,7 @@ export class RunOrchestrator {
   }
 
   /** Consumes adapter events + user inputs until the stream ends. */
-  private async pump(run: Run, handle: AgentHandle): Promise<PumpOutcome> {
+  private async pump(run: Run, handle: AgentHandle, secretValues: string[] = []): Promise<PumpOutcome> {
     const outcome: PumpOutcome = { cancelled: false, fatalError: null, result: null };
     let stopping = false;
 
@@ -274,7 +275,7 @@ export class RunOrchestrator {
 
         const resumeState = handle.getResumeState?.() ?? run.resumeState;
         run.setResumeState(resumeState ?? null);
-        await this.tx.saveRunAndEvents(run, [{ type: event.type, payload: event as unknown as Json }]);
+        await this.tx.saveRunAndEvents(run, [{ type: event.type, payload: redactSecrets(event as unknown as Json, secretValues) }]);
 
         if (stopping) break;
       }

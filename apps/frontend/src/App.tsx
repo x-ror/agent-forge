@@ -1,9 +1,12 @@
 import { Content, Dropdown, Header, HeaderGlobalAction, HeaderGlobalBar, HeaderName, InlineLoading, SideNav, SideNavItems, SideNavLink, Theme } from '@carbon/react';
 import { Asleep, Light, Logout } from '@carbon/icons-react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from './api/client';
 import { useMe, useLogout, useProjects } from './api/hooks';
 import { useAppState } from './state/app-state';
 import { LoginPage } from './features/auth/LoginPage';
+import { SetupWizard } from './features/setup/SetupWizard';
 import { TaskBoardPage } from './features/tasks/TaskBoardPage';
 import { WorkflowsPage } from './features/workflows/WorkflowsPage';
 import { WorkflowCanvasPage } from './features/workflows/WorkflowCanvasPage';
@@ -39,6 +42,12 @@ export default function App() {
   const logout = useLogout();
   const navigate = useNavigate();
   const location = useLocation();
+  const qc = useQueryClient();
+  const bootstrap = useQuery({
+    queryKey: ['bootstrap'],
+    enabled: me.isError,
+    queryFn: () => api.get<{ needsSetup: boolean }>('/auth/bootstrap'),
+  });
 
   if (me.isLoading) {
     return (
@@ -51,11 +60,7 @@ export default function App() {
   }
 
   if (me.isError) {
-    return (
-      <Theme theme={theme}>
-        <LoginPage />
-      </Theme>
-    );
+    return <Theme theme={theme}>{bootstrap.data?.needsSetup ? <SetupWizard onDone={() => void qc.invalidateQueries()} /> : <LoginPage />}</Theme>;
   }
 
   const nav = [

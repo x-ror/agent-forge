@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { Logger, LoggerErrorInterceptor } from 'nestjs-pino';
 import { ApiModule } from './api.module';
 import { loadEnv } from './config/env';
 import { runMigrations } from './database/migration-runner';
@@ -9,7 +10,9 @@ async function bootstrap(): Promise<void> {
   const env = loadEnv();
   // Advisory-lock-guarded; api owns migrations at boot (design §11.1).
   await runMigrations(env.DATABASE_ADMIN_URL);
-  const app = await NestFactory.create(ApiModule);
+  const app = await NestFactory.create(ApiModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  app.useGlobalInterceptors(new LoggerErrorInterceptor());
   app.setGlobalPrefix('api/v1');
   app.useGlobalFilters(new ProblemDetailsFilter());
   app.enableShutdownHooks();

@@ -228,3 +228,24 @@ Running log per implementation-cycle prompt. Newest phase last.
 - `@tanstack/react-virtual` added for the event feed (justified: §10 requires a virtualized feed; stays in the TanStack family).
 - Playwright runs as `pnpm test:e2e` (separate from `pnpm verify` — it needs Docker + a chromium download; CI can opt in).
 - The gate-before-PR template ships as a first-class canvas loader, matching the §12 recommendation for externally-triggered flows.
+
+---
+
+## Phase 10 — Hardening & ship (done)
+
+**Built:**
+
+- **Production images** (`node:26-slim` per user direction; pnpm via npm since Node 26 dropped corepack): server multi-stage build (`pnpm deploy --prod --legacy`, one image / two entrypoints, git + docker CLI copied from `docker:cli`, tini as PID 1); frontend nginx with the SSE-safe proxy template (`proxy_buffering off`, 1h read timeout, empty Connection header, SPA fallback), `API_ORIGIN` via nginx envsubst.
+- **`docker-compose.yml`** per §11.1 with the PG-18 volume-path fix; `.env.example` (postgres + app-role passwords, `AGENTFORGE_SECRET_KEY` with the openssl one-liner, `SANDBOX_DRIVER`); api/worker/postgres/redis publish no host ports — `:3000` is the single origin.
+- **`/setup` first-boot wizard**: `GET /auth/bootstrap` (users==0) switches the unauthenticated app into a 4-step Carbon wizard — account → project → default agents (+ encrypted `ANTHROPIC_API_KEY`) → seed both workflow templates.
+- **Metrics** at `/api/v1/metrics` (prom-client, PAT-gated by the global guard): queue depths, outbox undispatched count + max age, runs/flows by status, run-duration p50/p95 (24h), summed cost — computed at scrape time from the sources of truth.
+- **pino** structured request logging in the api (`nestjs-pino`, authorization/cookie headers redacted, SSE endpoints excluded from auto-logging).
+- **Secret redaction**: `redactSecrets` scrubs provisioned secret values from every protocol event payload before insert (unit-tested incl. JSON-escaped values); worker logs keep run/flow ids in-message for correlation.
+- **Auth rate limiting**: `@nestjs/throttler` — 10/min on register/login, 120/min default on identity routes.
+- **Docs**: README with the 5-minute compose quickstart + dev workflow, `SECURITY.md` (threat model, boundaries, gate-before-PR practice), `docs/backup-restore.md` (`pg_dump`-only story, restore procedure, why Redis is excluded).
+
+**Verified (DoD):** `docker compose up --build` from this repo: all five services healthy; SPA served on :3000; `/api/v1/health` `ok` with fresh worker heartbeat **through the nginx proxy**; `bootstrap → register → project → file task source → sync` exercised against the production containers (task synced from a repo inside the workspaces volume — dispatcher, queues, worker, git mirror all live); PAT-gated metrics return real series, anonymous access 401s; teardown clean. Full suite green: 97 tests + the Playwright canonical-flow e2e.
+
+**Honest gaps vs the final acceptance demo:** step 5 of the §"Final acceptance" (canonical flow against a **real** LLM) needs a real API key — the identical path is proven by the Playwright e2e against a scripted Anthropic-protocol server, and by unit/integration coverage everywhere else. The `llm-only` sandbox network policy still degrades to `full` with a loud warning (proxy sidecar not built). Restore-from-`pg_dump` is documented and its mechanism (reconciliation) is integration-tested via FLUSHALL + worker-kill tests, but a full dump/restore drill wasn't automated.
+
+**Decisions:** prom-client, nestjs-pino/pino-http, and @nestjs/throttler added (all §13/§14-mandated capabilities); `SANDBOX_DRIVER=process` is the compose default — the docker driver needs host-visible workspace paths (docker-socket-from-container path mapping), documented as an opt-in.

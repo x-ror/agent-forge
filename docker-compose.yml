@@ -1,0 +1,81 @@
+services:
+  postgres:
+    image: postgres:18
+    volumes:
+      # PG 18 images expect the mount at /var/lib/postgresql (not .../data).
+      - pgdata:/var/lib/postgresql
+    environment:
+      POSTGRES_DB: agentforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    # AOF is a nice-to-have; the system survives total Redis loss (§5.4).
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    image: agentforge/server:latest
+    environment: &appenv
+      DATABASE_URL: postgres://agentforge_app:${AGENTFORGE_APP_DB_PASSWORD:-agentforge_app}@postgres:5432/agentforge
+      DATABASE_ADMIN_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/agentforge
+      REDIS_URL: redis://redis:6379
+      AGENTFORGE_SECRET_KEY: ${AGENTFORGE_SECRET_KEY:?set AGENTFORGE_SECRET_KEY in .env (32-byte base64)}
+      AGENTFORGE_BASE_URL: http://localhost:3000
+      WORKSPACES_DIR: /data/workspaces
+      ARTIFACTS_DIR: /data/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    # no published ports — reachable only via the frontend proxy (§11.1)
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    image: agentforge/frontend:latest
+    ports:
+      - '3000:3000' # the single public origin
+    environment:
+      API_ORIGIN: http://api:3001
+    depends_on:
+      - api
+
+  worker:
+    image: agentforge/server:latest
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    command: ['node', 'dist/main.worker.js']
+    environment:
+      <<: *appenv
+      AGENT_MAX_CONCURRENT_RUNS: '3'
+      # 'docker' needs host-visible workspace paths; 'process' works out of the box.
+      SANDBOX_DRIVER: ${SANDBOX_DRIVER:-process}
+      SANDBOX_NETWORK_DEFAULT: ${SANDBOX_NETWORK_DEFAULT:-full}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - workspaces:/data/workspaces
+      - artifacts:/data/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+volumes:
+  pgdata: {}
+  redisdata: {}
+  workspaces: {}
+  artifacts: {}

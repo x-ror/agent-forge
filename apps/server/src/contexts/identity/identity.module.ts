@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthService } from './application/auth.service';
 import { PASSWORD_HASHER } from './domain/password-hasher';
@@ -10,6 +11,7 @@ import { AuthGuard } from './interface/auth.guard';
 import { PatController } from './interface/pat.controller';
 
 @Module({
+  imports: [ThrottlerModule.forRoot([{ limit: 120, ttl: 60_000 }])],
   controllers: [AuthController, PatController],
   providers: [
     AuthService,
@@ -18,6 +20,7 @@ import { PatController } from './interface/pat.controller';
     { provide: PAT_REPOSITORY, useClass: TypeormPersonalAccessTokenRepository },
     { provide: PASSWORD_HASHER, useClass: Argon2PasswordHasher },
     { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
   exports: [AuthService, USER_REPOSITORY],
 })
