@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:18
+    ports:
+      - '127.0.0.1:5432:5432'
+    environment:
+      POSTGRES_DB: agentforge
+      POSTGRES_PASSWORD: agentforge
+    volumes:
+      # PG 18 images expect the mount at /var/lib/postgresql (not .../data)
+      - pgdata-dev:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:6379:6379'
+    volumes:
+      - redisdata-dev:/data
+
+volumes:
+  pgdata-dev: {}
+  redisdata-dev: {}

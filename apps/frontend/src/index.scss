@@ -1,0 +1,7 @@
+// Carbon with font-face emission disabled; IBM Plex is bundled locally below
+// (no CDN calls — local-first, design doc §10.1).
+@use '@carbon/react' with (
+  $css--font-face: false
+);
+@use '@ibm/plex-sans/css/ibm-plex-sans-default.css';
+@use '@ibm/plex-mono/css/ibm-plex-mono-default.css';
