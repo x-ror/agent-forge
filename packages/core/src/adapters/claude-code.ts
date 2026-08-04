@@ -265,7 +265,10 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     ];
     const proc = await ctx.sandbox.spawn(args, { env: ctx.env });
     const handle = new ClaudeCodeHandle(proc, resumeSessionId);
-    handle.sendInitialPrompt(ctx.prompt);
+    // Repo-imported agents store their full markdown brief in config.systemPrompt.
+    const systemPrompt = typeof ctx.config.systemPrompt === 'string' && ctx.config.systemPrompt.trim().length > 0 ? ctx.config.systemPrompt.trim() : null;
+    const prompt = systemPrompt ? `# Agent instructions\n\n${systemPrompt}\n\n---\n\n# Task\n\n${ctx.prompt}` : ctx.prompt;
+    handle.sendInitialPrompt(prompt);
     return handle;
   }
 }

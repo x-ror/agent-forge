@@ -4,6 +4,8 @@ export type AdapterId = 'claude-code' | 'codex-cli' | 'openhands' | 'aider' | 'a
 
 export interface AgentConfig {
   model?: string;
+  /** Full role/prompt text imported from a project repo agent registry. */
+  systemPrompt?: string;
   /** Adapter-specific flags/options. */
   options?: Record<string, Json>;
   [key: string]: Json | undefined;

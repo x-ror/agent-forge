@@ -8,6 +8,7 @@ import type {
   FlowRunDto,
   PatDto,
   ProjectDto,
+  RepoAgentDto,
   RunDto,
   RunEventDto,
   RunInputRequest,
@@ -60,6 +61,25 @@ export function useCreateProject() {
   return useMutation({
     mutationFn: (body: CreateProjectRequest) => api.post<ProjectDto>('/projects', body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}
+
+/** In-repo agent registry (config/agents.json) with full prompt bodies. */
+export function useRepoAgents(projectId: string | null) {
+  return useQuery({
+    queryKey: ['repo-agents', projectId],
+    queryFn: () => api.get<RepoAgentDto[]>(`/projects/${projectId}/repo-agents`),
+    enabled: !!projectId,
+    staleTime: 60_000,
+  });
+}
+
+export function useRepoAgent(projectId: string | null, name: string | null) {
+  return useQuery({
+    queryKey: ['repo-agents', projectId, name],
+    queryFn: () => api.get<RepoAgentDto>(`/projects/${projectId}/repo-agents/${encodeURIComponent(name!)}`),
+    enabled: !!projectId && !!name,
+    staleTime: 60_000,
   });
 }
 

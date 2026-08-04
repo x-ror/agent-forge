@@ -108,6 +108,27 @@ export const agentDtoSchema = z.object({
 });
 export type AgentDto = z.infer<typeof agentDtoSchema>;
 
+/**
+ * Agents defined in the project's repository registry (e.g. Lava
+ * `config/agents.json` + prompt markdown). `description` is the full prompt
+ * body so callers can feed it to a run without a second fetch.
+ */
+export const repoAgentDtoSchema = z.object({
+  name: z.string(),
+  kind: z.enum(['agent', 'specialist']),
+  role: z.string(),
+  /** Full prompt text (markdown body). Empty when the prompt file is missing. */
+  description: z.string(),
+  promptPath: z.string().nullable(),
+  command: z.string().optional(),
+  provider: z.string().optional(),
+  isolation: z.string().optional(),
+  tools: z.array(z.string()).optional(),
+  /** Extra registry flags (design_first, hard_gate, …). */
+  meta: z.record(z.string(), z.unknown()).optional(),
+});
+export type RepoAgentDto = z.infer<typeof repoAgentDtoSchema>;
+
 // ---- Tasking ---------------------------------------------------------------
 export const taskStatusSchema = z.enum(['backlog', 'in_flow', 'done', 'failed', 'archived']);
 export type TaskStatusDto = z.infer<typeof taskStatusSchema>;

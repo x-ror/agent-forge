@@ -7,12 +7,14 @@ import {
   type CreateProjectRequest,
   type ProjectDto,
   type PutSecretRequest,
+  type RepoAgentDto,
   type UpdateProjectRequest,
 } from '@agentforge/core';
 import { CurrentUser, type AuthUser } from '../../../shared/http/auth.decorators';
 import { ZodValidationPipe } from '../../../shared/http/zod-validation.pipe';
 import type { Project } from '../domain/project';
 import { ProjectsService } from '../application/projects.service';
+import { RepoAgentsService } from '../application/repo-agents.service';
 
 function toDto(project: Project): ProjectDto {
   return {
@@ -27,7 +29,10 @@ function toDto(project: Project): ProjectDto {
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projects: ProjectsService) {}
+  constructor(
+    private readonly projects: ProjectsService,
+    private readonly repoAgents: RepoAgentsService,
+  ) {}
 
   @Get()
   async list(@CurrentUser() user: AuthUser): Promise<ProjectDto[]> {
@@ -53,6 +58,19 @@ export class ProjectsController {
   @HttpCode(204)
   async delete(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<void> {
     await this.projects.delete(user.userId, id);
+  }
+
+  // ---- Repo agent catalog (in-repo registry + full prompts) ----------------
+
+  /** Lava-style `config/agents.json` entries with full prompt bodies. */
+  @Get(':id/repo-agents')
+  async listRepoAgents(@CurrentUser() user: AuthUser, @Param('id') id: string): Promise<RepoAgentDto[]> {
+    return this.repoAgents.list(user.userId, id);
+  }
+
+  @Get(':id/repo-agents/:name')
+  async getRepoAgent(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('name') name: string): Promise<RepoAgentDto> {
+    return this.repoAgents.get(user.userId, id, name);
   }
 
   // ---- Secrets: write-only -------------------------------------------------

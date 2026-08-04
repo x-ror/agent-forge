@@ -82,12 +82,21 @@ function Inspector({
       <h5>{wf.type}</h5>
       <TextInput id="node-id" labelText="Node id" value={wf.id} onChange={(e) => onChangeNode({ ...wf, id: e.target.value })} />
       {'agent' in wf && (
-        <Select id="node-agent" labelText="Agent" value={wf.agent} onChange={(e) => onChangeNode({ ...wf, agent: e.target.value } as WorkflowNode)}>
-          <SelectItem value="" text="— choose an agent —" />
-          {agents.map((name) => (
-            <SelectItem key={name} value={name} text={name} />
-          ))}
-        </Select>
+        <>
+          <Select id="node-agent" labelText="Agent" value={wf.agent} onChange={(e) => onChangeNode({ ...wf, agent: e.target.value } as WorkflowNode)}>
+            <SelectItem value="" text="— choose an agent —" />
+            {agents.map((name) => (
+              <SelectItem key={name} value={name} text={name} />
+            ))}
+          </Select>
+          {agents.length === 0 ? (
+            <p className="af-repo-agent__role">
+              No runtime agents yet. Import from Settings → Repo agents (or register under Settings → Agents), then pick the agent <strong>by name</strong> here.
+            </p>
+          ) : (
+            <p className="af-repo-agent__role">Names must match registered runtime agents (Settings → Agents).</p>
+          )}
+        </>
       )}
       {'prompt' in wf && (
         <TextArea

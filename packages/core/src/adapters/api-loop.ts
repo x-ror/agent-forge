@@ -336,16 +336,18 @@ class ApiLoopHandle implements AgentHandle {
 
   private system(): string {
     const allowed = this.ctx.config.allowedCommands;
+    // Imported repo agents (Lava registry, etc.) land their full prompt in config.systemPrompt.
+    const imported = typeof this.ctx.config.systemPrompt === 'string' && this.ctx.config.systemPrompt.trim().length > 0 ? this.ctx.config.systemPrompt.trim() : null;
+    const base = imported ? [imported] : [`You are an autonomous coding agent working in a sandboxed workspace.`, `Use the provided tools to inspect and modify the code.`];
     return [
-      `You are an autonomous coding agent working in a sandboxed workspace.`,
-      `Use the provided tools to inspect and modify the code.`,
+      ...base,
       allowed ? `Commands matching these prefixes run without approval: ${allowed.join(', ') || '(none)'}. Other commands require user approval.` : ``,
       this.ctx.structured
         ? `You are making a routing decision. Call the \`decide\` tool exactly once with one of: ${this.ctx.structured.routes.join(', ')}.`
         : `When you are completely done, reply with a plain text summary of what you did (no tool calls).`,
     ]
       .filter(Boolean)
-      .join('\n');
+      .join('\n\n');
   }
 
   private provider(): ChatProvider {

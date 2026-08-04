@@ -53,6 +53,142 @@
   color: var(--cds-text-secondary);
 }
 
+.af-repo-agent__role {
+  margin-top: 0.25rem;
+  color: var(--cds-text-secondary);
+  font-size: 0.875rem;
+}
+
+.af-repo-agent__view-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ---- markdown (pretty agent / prompt view) ---- */
+.af-md {
+  max-height: 60vh;
+  overflow: auto;
+  padding: 1rem;
+  background: var(--cds-layer-01);
+  border: 1px solid var(--cds-border-subtle);
+  border-radius: 0.25rem;
+  color: var(--cds-text-primary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.af-md > :first-child {
+  margin-top: 0;
+}
+
+.af-md > :last-child {
+  margin-bottom: 0;
+}
+
+.af-md h1,
+.af-md h2,
+.af-md h3,
+.af-md h4 {
+  margin: 1.25em 0 0.5em;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.af-md h1 {
+  font-size: 1.35rem;
+}
+
+.af-md h2 {
+  font-size: 1.15rem;
+}
+
+.af-md h3 {
+  font-size: 1rem;
+}
+
+.af-md p,
+.af-md ul,
+.af-md ol,
+.af-md pre,
+.af-md blockquote {
+  margin: 0.75em 0;
+}
+
+.af-md ul,
+.af-md ol {
+  padding-left: 1.5rem;
+}
+
+.af-md li + li {
+  margin-top: 0.25em;
+}
+
+.af-md a {
+  color: var(--cds-link-primary);
+}
+
+.af-md code {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+  background: var(--cds-layer-02);
+  border-radius: 0.15rem;
+}
+
+.af-md pre {
+  padding: 0.75rem 1rem;
+  overflow: auto;
+  background: var(--cds-layer-02);
+  border-radius: 0.25rem;
+}
+
+.af-md pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 0.8125rem;
+}
+
+.af-md blockquote {
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--cds-border-strong);
+  color: var(--cds-text-secondary);
+}
+
+.af-md hr {
+  margin: 1.25em 0;
+  border: 0;
+  border-top: 1px solid var(--cds-border-subtle);
+}
+
+.af-md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75em 0;
+}
+
+.af-md th,
+.af-md td {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--cds-border-subtle);
+  text-align: left;
+}
+
+.af-md-raw {
+  max-height: 60vh;
+  overflow: auto;
+  margin: 0;
+  padding: 1rem;
+  background: var(--cds-layer-01);
+  border: 1px solid var(--cds-border-subtle);
+  border-radius: 0.25rem;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ---- page chrome ---- */
 .af-page__header {
   display: flex;

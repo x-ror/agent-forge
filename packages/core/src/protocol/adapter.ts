@@ -67,6 +67,12 @@ export interface StructuredOutputSpec {
 export interface AgentRunConfig {
   /** Model identifier, adapter-specific (e.g. 'claude-sonnet-5'). */
   model?: string;
+  /**
+   * Full system / role prompt (e.g. imported from a project's repo agent
+   * registry). Adapters that support a system channel use it as such;
+   * others prepend it to the task prompt.
+   */
+  systemPrompt?: string;
   /** Adapter-specific flags/options from the registered agent's config. */
   options?: Record<string, Json>;
   /** Commands the agent may run without a permission gate; empty = gate everything. */

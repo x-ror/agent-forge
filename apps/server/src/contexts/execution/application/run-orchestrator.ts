@@ -147,6 +147,7 @@ export class RunOrchestrator {
         prompt: run.taskPrompt,
         config: {
           model: agent.config.model,
+          systemPrompt: typeof agent.config.systemPrompt === 'string' ? agent.config.systemPrompt : undefined,
           options: agent.config.options,
           allowedCommands: project.settings.allowedCommands,
           timeoutMs: DEFAULT_RUN_TIMEOUT_MS,
