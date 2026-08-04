@@ -221,7 +221,11 @@ export class RunOrchestrator {
           }
           await this.inputs.markConsumed(input.id);
         }
-      })();
+      })().catch((error) => {
+        // Transient DB/pool errors (incl. teardown after an abandoned run)
+        // must not surface as unhandled rejections; next tick retries.
+        this.logger.debug(`input pump for run ${run.id}: ${String(error)}`);
+      });
     }, INPUT_POLL_MS);
 
     try {

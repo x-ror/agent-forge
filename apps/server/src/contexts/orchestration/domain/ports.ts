@@ -44,6 +44,17 @@ export interface TickOps {
 export interface OrchestrationTxPort {
   /** Runs `fn` inside a tx holding the flow's advisory lock; null if flow missing. */
   withFlowTick<T>(flowRunId: string, fn: (ops: TickOps) => Promise<T>): Promise<T | null>;
+  /**
+   * Flow start (§2.5): flow_runs row + trigger step + task→in_flow +
+   * flow.advance_requested outbox — one transaction.
+   */
+  startFlow(args: { flowRun: FlowRunAggregate; triggerStep: FlowStep; taskId: string }): Promise<void>;
+}
+
+/** Structural interface for the FlowRun aggregate (avoids a class import cycle). */
+export interface FlowRunAggregate {
+  id: string;
+  snapshot(): FlowRunProps;
 }
 
 export const ORCHESTRATION_TX = Symbol('OrchestrationTxPort');

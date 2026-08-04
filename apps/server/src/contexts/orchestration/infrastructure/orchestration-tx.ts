@@ -9,7 +9,7 @@ import { RunEntity } from '../../execution/infrastructure/entities';
 import { FlowRunEntity, FlowStepEntity } from './entities';
 import type { FlowContext, FlowRunProps, FlowStatus } from '../domain/flow-run';
 import type { FlowStep, FlowStepDecision, FlowStepStatus } from '../domain/flow-step';
-import type { OrchestrationTxPort, RunInfo, TickOps, TickState } from '../domain/ports';
+import type { FlowRunAggregate, OrchestrationTxPort, RunInfo, TickOps, TickState } from '../domain/ports';
 
 class EmTickOps implements TickOps {
   constructor(
@@ -182,6 +182,30 @@ export class OrchestrationTxOps implements OrchestrationTxPort {
     private readonly uow: UnitOfWork,
     private readonly outbox: OutboxWriter,
   ) {}
+
+  async startFlow(args: { flowRun: FlowRunAggregate; triggerStep: FlowStep; taskId: string }): Promise<void> {
+    await this.uow.withTx(async (em) => {
+      const snapshot = args.flowRun.snapshot();
+      await em.getRepository(FlowRunEntity).insert({ ...snapshot });
+      await em.getRepository(FlowStepEntity).insert({ ...args.triggerStep });
+      await em.query(`UPDATE tasks SET status = 'in_flow', updated_at = now() WHERE id = $1`, [args.taskId]);
+      const [taskRow]: Array<{ project_id: string }> = await em.query(`SELECT project_id FROM tasks WHERE id = $1`, [args.taskId]);
+      await this.outbox.append(em, [
+        {
+          aggregateType: 'flow_run',
+          aggregateId: snapshot.id,
+          eventType: EventTypes.FlowAdvanceRequested,
+          payload: { reason: 'flow_started' },
+        },
+        {
+          aggregateType: 'task',
+          aggregateId: args.taskId,
+          eventType: EventTypes.TaskStatusChanged,
+          payload: { projectId: taskRow?.project_id ?? null, status: 'in_flow' },
+        },
+      ]);
+    });
+  }
 
   async withFlowTick<T>(flowRunId: string, fn: (ops: TickOps) => Promise<T>): Promise<T | null> {
     return this.uow.withTx(async (em) => {

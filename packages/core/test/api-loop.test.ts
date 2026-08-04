@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ApiLoopAdapter } from '../src';
 import { collectEvents, expectEventOrder, LocalSandbox, makeRunContext } from '../src/conformance';
-import { startMockLlm } from './helpers/mock-llm';
+import { startMockLlm } from '../src/conformance';
 
 const KEY_ENV = { ANTHROPIC_API_KEY: 'test-key', OPENAI_API_KEY: 'test-key' };
 

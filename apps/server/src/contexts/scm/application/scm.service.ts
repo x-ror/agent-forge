@@ -5,6 +5,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { APP_ENV, type AppEnv } from '../../../config/env';
 import { uuidv7 } from '../../../shared/uuidv7';
 import type { Project } from '../../projects/domain/project';
+import { PROJECT_REPOSITORY, type ProjectRepository } from '../../projects/domain/repositories';
 import { SecretProvisioningService } from '../../projects/application/projects.service';
 import { ARTIFACT_REPOSITORY, type ArtifactRepository } from '../../execution/domain/repositories';
 import { parseGithubRepo, sanitizeBranchName, ScmError, type PullRequestResult, type WorktreeInfo } from '../domain/scm';
@@ -24,8 +25,16 @@ export class ScmService {
     @Inject(ARTIFACT_REPOSITORY) private readonly artifacts: ArtifactRepository,
     @Inject(GIT_PORT) private readonly git: GitPort,
     @Inject(GITHUB_PORT) private readonly github: GithubPort,
+    @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     private readonly secrets: SecretProvisioningService,
   ) {}
+
+  /** Load a project for worktree/PR operations (engine convenience). */
+  async projectForWorktree(projectId: string): Promise<Project> {
+    const project = await this.projects.findById(projectId);
+    if (!project) throw new ScmError(`project ${projectId} not found`);
+    return project;
+  }
 
   mirrorPath(projectId: string): string {
     return path.join(this.env.WORKSPACES_DIR, 'mirrors', `${projectId}.git`);
@@ -143,7 +152,16 @@ export class ScmService {
    * token, falls back to a patch artifact — never fails the flow for missing
    * infrastructure.
    */
-  async pushAndOpenPr(args: { project: Project; runId: string; worktree: string; branch: string; baseRef: string; title: string; body: string }): Promise<PullRequestResult> {
+  async pushAndOpenPr(args: {
+    project: Project;
+    runId: string | null;
+    flowRunId?: string | null;
+    worktree: string;
+    branch: string;
+    baseRef: string;
+    title: string;
+    body: string;
+  }): Promise<PullRequestResult> {
     const env = await this.secrets.decryptedEnv(args.project.id);
     const token = env.GITHUB_TOKEN ?? env.GH_TOKEN;
     const githubRepo = parseGithubRepo(args.project.repoUrl);
@@ -175,6 +193,7 @@ export class ScmService {
       await this.artifacts.insert({
         id: uuidv7(),
         runId: args.runId,
+        flowRunId: args.flowRunId ?? null,
         kind: 'pr',
         name: `PR #${pr.number}`,
         content: null,
@@ -189,6 +208,7 @@ export class ScmService {
     await this.artifacts.insert({
       id: uuidv7(),
       runId: args.runId,
+      flowRunId: args.flowRunId ?? null,
       kind: 'pr',
       name: `branch ${args.branch}`,
       content: null,
@@ -199,12 +219,21 @@ export class ScmService {
     return { kind: 'pr', url: null, number: null, artifactId: null, branch: args.branch };
   }
 
-  private async patchArtifact(args: { project: Project; runId: string; worktree: string; branch: string; baseRef: string; title: string }): Promise<PullRequestResult> {
+  private async patchArtifact(args: {
+    project: Project;
+    runId: string | null;
+    flowRunId?: string | null;
+    worktree: string;
+    branch: string;
+    baseRef: string;
+    title: string;
+  }): Promise<PullRequestResult> {
     const { stdout } = await this.git.run(['-C', args.worktree, 'format-patch', `${args.baseRef}..HEAD`, '--stdout']);
     const artifactId = uuidv7();
     await this.artifacts.insert({
       id: artifactId,
       runId: args.runId,
+      flowRunId: args.flowRunId ?? null,
       kind: 'patch',
       name: `${sanitizeBranchName(args.title)}.patch`,
       content: Buffer.from(stdout, 'utf8'),

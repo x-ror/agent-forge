@@ -49,9 +49,7 @@ export class TypeormSecretRepository implements SecretRepository {
   }
 
   async listKeys(projectId: string): Promise<string[]> {
-    const rows = await this.ds
-      .getRepository(SecretEntity)
-      .find({ where: { projectId }, select: { key: true }, order: { key: 'ASC' } });
+    const rows = await this.ds.getRepository(SecretEntity).find({ where: { projectId }, select: { key: true }, order: { key: 'ASC' } });
     return rows.map((r) => r.key);
   }
 

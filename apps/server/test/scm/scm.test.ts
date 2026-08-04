@@ -44,7 +44,14 @@ describe('Phase 6: Scm — mirrors, worktrees, diff, push, PR', () => {
     };
     artifacts = new TypeormArtifactRepository(ds);
     const secretBox = new SecretBox(TEST_KEY) as SecretBoxService;
-    scm = new ScmService(env, artifacts, new GitCli(), new GithubClient(), new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox));
+    scm = new ScmService(
+      env,
+      artifacts,
+      new GitCli(),
+      new GithubClient(),
+      new TypeormProjectRepository(ds),
+      new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox),
+    );
 
     const users = new TypeormUserRepository(ds);
     const userId = uuidv7();

@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "nest build",
-    "dev": "nest start --watch --entryFile main.api",
-    "dev:worker": "nest start --watch --entryFile main.worker",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput & node --watch --enable-source-maps dist/main.api.js",
+    "dev:worker": "node --watch --enable-source-maps dist/main.worker.js",
     "start:api": "node dist/main.api.js",
     "start:worker": "node dist/main.worker.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",

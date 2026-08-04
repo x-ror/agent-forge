@@ -7,7 +7,7 @@ import { installAdapters } from '../../src/adapters/install';
 import { connectApp } from '../helpers/pg';
 import { HttpClient, startTestApp, type TestApp } from '../helpers/app';
 import { buildTestWorker, type TestWorker } from '../helpers/worker';
-import { startMockLlm, type MockLlm } from '../../../../packages/core/test/helpers/mock-llm';
+import { startMockLlm, type MockLlm } from '@agentforge/core/conformance';
 import { makeLocalRepo } from '../helpers/git';
 
 const TEST_KEY = Buffer.from('0123456789abcdef0123456789abcdef').toString('base64');

@@ -208,6 +208,68 @@ export const runInputRequestSchema = z.discriminatedUnion('kind', [
 ]);
 export type RunInputRequest = z.infer<typeof runInputRequestSchema>;
 
+// ---- Workflows & flow runs -------------------------------------------------
+export const createWorkflowRequestSchema = z.object({
+  projectId: z.uuid(),
+  name: z.string().min(1).max(200),
+  definition: z.unknown(), // validated against workflowDefinitionSchema server-side
+});
+export type CreateWorkflowRequest = z.infer<typeof createWorkflowRequestSchema>;
+
+export const newWorkflowVersionRequestSchema = z.object({
+  definition: z.unknown(),
+});
+export type NewWorkflowVersionRequest = z.infer<typeof newWorkflowVersionRequestSchema>;
+
+export const workflowDtoSchema = z.object({
+  id: z.uuid(),
+  projectId: z.uuid(),
+  name: z.string(),
+  version: z.number().int(),
+  definition: z.unknown(),
+  enabled: z.boolean(),
+  createdAt: z.iso.datetime(),
+});
+export type WorkflowDto = z.infer<typeof workflowDtoSchema>;
+
+export const startFlowRequestSchema = z.object({
+  workflowId: z.uuid(),
+  taskId: z.uuid(),
+});
+export type StartFlowRequest = z.infer<typeof startFlowRequestSchema>;
+
+export const flowStatusSchema = z.enum(['running', 'awaiting_input', 'succeeded', 'failed', 'cancelled']);
+
+export const flowStepDtoSchema = z.object({
+  id: z.uuid(),
+  nodeId: z.string(),
+  kind: z.enum(['trigger', 'action', 'agent', 'decision', 'gate']),
+  status: z.string(),
+  runId: z.uuid().nullable(),
+  decision: z.object({ route: z.string(), reasoning: z.string() }).nullable(),
+  startedAt: z.iso.datetime(),
+  finishedAt: z.iso.datetime().nullable(),
+});
+export type FlowStepDto = z.infer<typeof flowStepDtoSchema>;
+
+export const flowRunDtoSchema = z.object({
+  id: z.uuid(),
+  workflowId: z.uuid(),
+  taskId: z.uuid(),
+  status: flowStatusSchema,
+  context: z.record(z.string(), z.unknown()),
+  startedAt: z.iso.datetime(),
+  finishedAt: z.iso.datetime().nullable(),
+  steps: z.array(flowStepDtoSchema).optional(),
+});
+export type FlowRunDto = z.infer<typeof flowRunDtoSchema>;
+
+export const gateDecisionRequestSchema = z.object({
+  approve: z.boolean(),
+  note: z.string().max(2000).optional(),
+});
+export type GateDecisionRequest = z.infer<typeof gateDecisionRequestSchema>;
+
 // ---- Problem details (RFC 9457) -------------------------------------------
 export const problemDetailsSchema = z.object({
   type: z.string(),

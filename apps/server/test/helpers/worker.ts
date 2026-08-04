@@ -18,6 +18,8 @@ import { QUEUE_CONFIG, QUEUE_NAMES, type QueueName } from '../../src/shared/queu
 import type { QueueMap } from '../../src/shared/queue/queue.module';
 import { ReconciliationService } from '../../src/worker/reconciliation.service';
 import { ScmService } from '../../src/contexts/scm/application/scm.service';
+import { FlowEngine } from '../../src/contexts/orchestration/application/flow-engine.service';
+import { OrchestrationTxOps } from '../../src/contexts/orchestration/infrastructure/orchestration-tx';
 import { GitCli } from '../../src/contexts/scm/infrastructure/git-cli';
 import { GithubClient } from '../../src/contexts/scm/infrastructure/github-client';
 import { TypeormArtifactRepository } from '../../src/contexts/execution/infrastructure/typeorm-repositories';
@@ -26,6 +28,7 @@ export interface TestWorker {
   registry: AdapterRegistry;
   orchestrator: RunOrchestrator;
   scm: ScmService;
+  flowEngine: FlowEngine;
   dispatcher: OutboxDispatcher;
   reconciliation: ReconciliationService;
   queues: QueueMap;
@@ -54,7 +57,7 @@ export function buildTestWorker(ds: DataSource, redisUrl: string, redisClient: R
   const secretBox = new SecretBox(env.AGENTFORGE_SECRET_KEY) as SecretBoxService;
   const secretProvisioning = new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox);
 
-  const scm = new ScmService(env, new TypeormArtifactRepository(ds), new GitCli(), new GithubClient(), secretProvisioning);
+  const scm = new ScmService(env, new TypeormArtifactRepository(ds), new GitCli(), new GithubClient(), new TypeormProjectRepository(ds), secretProvisioning);
 
   const orchestrator = new RunOrchestrator(
     new TypeormRunRepository(ds),
@@ -71,6 +74,7 @@ export function buildTestWorker(ds: DataSource, redisUrl: string, redisClient: R
 
   const dispatcher = new OutboxDispatcher(ds, redisClient, queueMap);
   const reconciliation = new ReconciliationService(ds, queueMap);
+  const flowEngine = new FlowEngine(new OrchestrationTxOps(uow, outboxWriter), scm);
 
   const bullWorker = new Worker(
     'run.execute',
@@ -82,11 +86,22 @@ export function buildTestWorker(ds: DataSource, redisUrl: string, redisClient: R
       concurrency: 3,
     },
   );
+  const flowWorker = new Worker(
+    'flow.advance',
+    async (job) => {
+      await flowEngine.tick((job.data as { flowRunId: string }).flowRunId);
+    },
+    {
+      connection: new IORedis(redisUrl, { maxRetriesPerRequest: null }),
+      concurrency: 5,
+    },
+  );
 
   return {
     registry,
     orchestrator,
     scm,
+    flowEngine,
     dispatcher,
     reconciliation,
     queues: queueMap,
@@ -95,6 +110,7 @@ export function buildTestWorker(ds: DataSource, redisUrl: string, redisClient: R
     stop: async () => {
       dispatcher.stop();
       await bullWorker.close(true);
+      await flowWorker.close(true);
       await Promise.all(Object.values(queueMap).map((q) => q.close()));
     },
   };

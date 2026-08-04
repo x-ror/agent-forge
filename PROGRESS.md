@@ -180,3 +180,27 @@ Running log per implementation-cycle prompt. Newest phase last.
 
 - The board SSE is deliberately cursor-less (unlike run streams): it's a wake-up channel over snapshot data; the durable-cursor machinery stays where the data is an append-only log.
 - File-source task keys are `file:<path>:<slug(title)>` — retitling a checklist line creates a new task rather than silently rebinding history (recorded; simplest consistent choice).
+
+---
+
+## Phase 8 — Orchestration: the workflow engine (done)
+
+**Built:**
+
+- **FlowEngine** — a stateless process manager ticked by `flow.advance` jobs (§7.3). One tick, inside a single transaction holding a **per-flow advisory lock** (`pg_advisory_xact_lock`, so concurrent ticks serialize): complete agent/decision steps whose runs finished (context merge incl. `diff`, `diff_summary`, `diff_lines` from the run's diff artifact), expire timed-out gates (timeout ⇒ rejection, §3.1 "never hang forever"), resolve edges **to a fixpoint** (immediate steps — triggers, rule decisions, notify — cascade within one tick), start next nodes, settle. External side effects (worktree creation, PR push) run after commit, complete their steps in follow-up transactions, and re-tick.
+- All node types execute: triggers (pre-completed at flow start), `action.create_worktree` (shared flow worktree via Scm), `action.agent` / `decision.agent` (runs created in-tick with rendered prompts, `workspacePath` = the shared worktree, `structured` routes for decisions; the run orchestrator then owns them), `decision.rule` (ordered `when` expressions with a tiny `path op literal` evaluator), `gate.human` (step + flow → `awaiting_input`), `action.open_pr` (push + PR/patch via Scm, result into context), `action.notify` (outbox → `notify.deliver`).
+- **Decision coercion** (§7.3): structured `{route, reasoning}` validated against declared routes (case-insensitive rescue, unique-mention-in-summary fallback); uncoercible output fails the step honestly with the reasoning recorded.
+- **Settlement semantics**: flow succeeds only when nothing is active/startable and nothing failed; any failed step or rejected gate (even when a failure edge handled it) ends the flow `failed` and the task `failed`; cancellation returns the task to `backlog`; otherwise task → `done` (§7.3 task propagation).
+- Workflows CRUD with versioning (create = v1, edit = n+1, list shows latest, runs pin their version) and server-side validation on top of the shared schema: referenced agents exist; `decision.agent` nodes must bind adapters declaring `structuredOutput`.
+- Flow-runs API: start (one tx: flow + trigger step + task→`in_flow` + advance tick), detail (steps + decisions + context), gate approve/reject, cumulative diff (latest diff artifact among the flow's runs), SSE stream of step/status changes.
+- Reconciliation now ticks **every active flow** each pass (minute-bucketed jobIds) — one mechanism covers crash recovery, stalled flows, and gate timeouts.
+- Migration 2: `runs.structured` (decision spec through to `RunContext.structured`), artifacts `run_id` nullable + `flow_run_id` for flow-level PR artifacts.
+
+**Verified (DoD):** e2e — the canonical §7.2 flow with fake adapters runs end-to-end: worktree → implement (writes a real file; prompt templated from the task) → triage decides `deep` with reasoning stored on the step → deep review runs **in the same worktree and reads implement's file** (asserted from its event log; `light` never starts) → PR step pushes `agentforge/…` to the bare remote (branch in flow context + on the remote) → flow `succeeded`, task `done`, flow diff has both steps' files. Failure edge: failing implement routes to the notify step, success path never runs, flow+task `failed`. Gates: `awaiting_input` → approve (note stored as reasoning) → `succeeded`; reject → rejected path runs, flow `failed`. Crash: worker stopped mid-implement, lease aged, fresh worker + reconciliation → run resumes (`orchestrator.resumed`), flow completes, task `done`. Invalid workflows (unknown agent, adapter without structuredOutput, broken graph) rejected at save. 91 tests green.
+
+**Decisions (also absorbing the user's toolchain updates):**
+
+- Toolchain moved to **Oxlint + Oxfmt** and latest deps (TypeORM 1.1, BullMQ 6, ioredis 6, TS 7, Vitest 4) by the user; the DDD boundary rules live on in `.oxlintrc.json`. TS 7.0 lacks the compiler API `nest build` needs, so the server builds with plain `tsc -p tsconfig.build.json` (no Nest CLI plugins were in use).
+- Gate timeout ⇒ outcome `rejected` (routes to a rejected edge when present, else fails the flow) — auto-fail with an escape hatch.
+- The engine's tick is **pure state reconciliation** — the job's `event` field is informational only; every tick is idempotent, which is what makes at-least-once delivery and blanket reconciliation ticks safe.
+- `mock-llm` moved into `@agentforge/core/conformance` (TS 7 forbids cross-package rootDir imports; it belongs to the kit anyway).

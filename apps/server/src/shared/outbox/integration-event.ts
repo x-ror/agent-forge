@@ -20,6 +20,7 @@ export const EventTypes = {
   RunInputReceived: 'run.input_received',
   // Orchestration
   FlowAdvanceRequested: 'flow.advance_requested',
+  FlowStepChanged: 'flow.step_changed',
   FlowStatusChanged: 'flow.status_changed',
   DecisionMade: 'decision.made',
   GateApproved: 'gate.approved',

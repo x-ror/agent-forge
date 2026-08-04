@@ -4,6 +4,7 @@ import { ProjectsModule } from './contexts/projects/projects.module';
 import { ScmModule } from './contexts/scm/scm.module';
 import { TaskingModule } from './contexts/tasking/tasking.module';
 import { NotificationsModule } from './contexts/notifications/notifications.module';
+import { OrchestrationModule } from './contexts/orchestration/orchestration.module';
 import { DatabaseModule } from './database/database.module';
 import { EnvModule } from './shared/env.module';
 import { OutboxDispatcher } from './shared/outbox/outbox-dispatcher.service';
@@ -36,7 +37,19 @@ export class WorkerLifecycle implements OnModuleInit, OnApplicationShutdown {
 }
 
 @Module({
-  imports: [EnvModule, DatabaseModule, RedisModule, QueueModule, OutboxModule, ExecutionWorkerModule, ScmModule, ProjectsModule, TaskingModule, NotificationsModule],
+  imports: [
+    EnvModule,
+    DatabaseModule,
+    RedisModule,
+    QueueModule,
+    OutboxModule,
+    ExecutionWorkerModule,
+    ScmModule,
+    ProjectsModule,
+    TaskingModule,
+    NotificationsModule,
+    OrchestrationModule,
+  ],
   providers: [OutboxDispatcher, ReconciliationService, WorkerHeartbeat, WorkerLifecycle, ProcessorsService],
 })
 export class WorkerModule {}

@@ -170,3 +170,5 @@ export function expectEventOrder(events: AgentEvent[], expected: string[]): void
     index = found + 1;
   }
 }
+
+export * from './mock-llm';

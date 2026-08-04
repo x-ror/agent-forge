@@ -7,6 +7,7 @@ import { PROJECT_REPOSITORY, type ProjectRepository } from '../contexts/projects
 import { ScmService } from '../contexts/scm/application/scm.service';
 import { TaskSyncService } from '../contexts/tasking/application/task-sync.service';
 import { NotificationsService } from '../contexts/notifications/application/notifications.service';
+import { FlowEngine } from '../contexts/orchestration/application/flow-engine.service';
 
 /**
  * BullMQ consumers (worker entrypoint only). Each Worker gets its own
@@ -25,6 +26,7 @@ export class ProcessorsService implements OnModuleInit, OnApplicationShutdown {
     private readonly scm: ScmService,
     private readonly taskSync: TaskSyncService,
     private readonly notifications: NotificationsService,
+    private readonly flowEngine: FlowEngine,
   ) {}
 
   onModuleInit(): void {
@@ -58,6 +60,16 @@ export class ProcessorsService implements OnModuleInit, OnApplicationShutdown {
         {
           connection: new IORedis(this.env.REDIS_URL, { maxRetriesPerRequest: null }),
           concurrency: 2,
+        },
+      ),
+      new Worker(
+        'flow.advance',
+        async (job) => {
+          await this.flowEngine.tick((job.data as { flowRunId: string }).flowRunId);
+        },
+        {
+          connection: new IORedis(this.env.REDIS_URL, { maxRetriesPerRequest: null }),
+          concurrency: 5,
         },
       ),
       new Worker(

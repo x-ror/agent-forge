@@ -43,16 +43,13 @@ export class ReconciliationService {
         report.requeuedRuns += 1;
       }
 
-      // Flows that are running but have no active step and no pending tick.
-      const stalledFlows: Array<{ id: string }> = await this.ds.query(
-        `SELECT f.id FROM flow_runs f
-          WHERE f.status = 'running'
-            AND NOT EXISTS (
-              SELECT 1 FROM flow_steps s
-               WHERE s.flow_run_id = f.id AND s.status IN ('running','awaiting_input'))`,
-      );
-      for (const { id } of stalledFlows) {
-        await this.queues['flow.advance'].add('flow.advance', { flowRunId: id, event: 'reconcile' }, { jobId: `flow.advance__${id}__reconcile` });
+      // Every active flow gets a periodic tick (idempotent; the engine's
+      // planning pass is a no-op unless state moved). Covers crash recovery
+      // AND gate timeouts (§5.4, §7.3).
+      const activeFlows: Array<{ id: string }> = await this.ds.query(`SELECT id FROM flow_runs WHERE status IN ('running','awaiting_input')`);
+      const flowBucket = Math.floor(Date.now() / 60_000);
+      for (const { id } of activeFlows) {
+        await this.queues['flow.advance'].add('flow.advance', { flowRunId: id, event: 'reconcile' }, { jobId: `flow.advance__${id}__reconcile__${flowBucket}` });
         report.requeuedFlows += 1;
       }
 
