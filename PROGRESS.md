@@ -119,3 +119,25 @@ Running log per implementation-cycle prompt. Newest phase last.
 - `AgentHandle` gained an optional `getResumeState?(): Json` — the doc's `resume(ctx, state)` needs the orchestrator to have persisted state from somewhere; adapters expose a cheap checkpoint after each event batch. Backward compatible with §6.1.
 - Docker driver shells out to the docker CLI instead of adding dockerode: worker image controls the CLI version, `execFile` is auditable, and no new dependency (recorded per working rules). `llm-only` currently degrades to `full` with a loud warning; the proxy sidecar is Phase 10 work.
 - Cross-context read `flowRunIdFor(runId)` (execution → flow_steps) is raw SQL inside `RunTxOps`, documented as the seam to revisit when Orchestration lands in Phase 8.
+
+---
+
+## Phase 5 — Adapter SDK + api-loop + claude-code (done)
+
+**Built:**
+
+- **SDK extensions** in `packages/core`: `SandboxProcess` + `SandboxHandle.spawn()` (CLI agents need streaming stdio, one-shot `exec` can't provide it), `EventChannel`/`Gate`/`lines` adapter utilities.
+- **`api-loop` reference adapter** (§6.4): provider-agnostic loop over raw `fetch` — Anthropic Messages API and OpenAI-compatible chat/completions (a neutral transcript maps to both, so Ollama/vLLM work for the offline path); tools `run_command`/`read_file`/`write_file`/`apply_patch`/`search` via sandbox exec; `allowed_commands` enforced exactly (prefix match; non-matching commands emit `permission.request` and block on the gate); `decide` tool with route-enum schema for structured decisions; transcript-replay resume via `getResumeState()`; mid-run steering queued into the next turn; `file.change` events on writes/patches.
+- **`claude-code` CLI adapter** (§6.3): drives the headless stream-json protocol over sandbox `spawn` stdio; maps init/assistant/tool_result/control_request/result to the 9-event union; permission gates ↔ `can_use_tool` control requests with allow/deny control responses; `--version` handshake fails at start; resume via `--resume <sessionId>`; graceful TERM→KILL stop.
+- **Conformance kit** at `@agentforge/core/conformance` (Node-only subpath export): `LocalSandbox` (real child processes incl. `spawn`), `collectEvents`, `expectEventOrder`, `makeRunContext`.
+- **AgentRegistry context completed**: agents CRUD (`/api/v1/agents`, adapter-installed + name-unique validation) and `/api/v1/adapters` capability listing; `installAdapters()` registers shipped adapters in both entrypoints (worker executes them, api serves capabilities).
+- `spawn` implemented in both sandbox drivers (docker via `docker exec -i`).
+
+**Verified (DoD):** conformance suites pass for both adapters — golden event sequence, permission gate (allow runs the tool / deny short-circuits), clean cancellation (stream ends promptly, no result), structured output for api-loop (route enum advertised to the model, `{route, reasoning}` captured), resume for both (transcript replay incl. pre-crash tool exchange / `--resume` session), version-handshake failure, missing-API-key failure. Full-stack e2e: mocked Anthropic server → agent created via API → encrypted `ANTHROPIC_API_KEY` secret provisioned to the sandbox → run succeeds with the expected event log and a file really written in the workspace. 66 tests green.
+
+**Decisions:**
+
+- No provider SDK dependencies: raw `fetch` against both HTTP APIs keeps `packages/core` dependency-free (zod only) and works in any runtime.
+- claude-code's mock CLI fixture speaks the real stream-json shapes (init/session_id, control_request/response, result with cost) so the mapping is tested without the actual binary; the `--version` handshake plus conformance keeps the contract honest when the real CLI lands.
+- `allowed_commands` semantics: `undefined` = unrestricted (project didn't opt into gating), `[]` = gate everything, else prefix allow-list; `'*'` wildcard supported.
+- codex-cli / openhands / aider adapters remain unimplemented (doc lists them as adapter family members; the two shipped ones cover both integration styles — API loop and CLI stdio). Adding one later is exactly the §6.5 checklist.

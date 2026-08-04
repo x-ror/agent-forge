@@ -31,6 +31,19 @@ export interface SandboxExecOptions {
   stdin?: string;
 }
 
+/** A long-running process inside the sandbox (CLI agents run over stdio). */
+export interface SandboxProcess {
+  writeStdin(data: string): void;
+  endStdin(): void;
+  /** Raw stdout chunks as they arrive. */
+  stdout: AsyncIterable<string>;
+  /** Raw stderr chunks as they arrive. */
+  stderr: AsyncIterable<string>;
+  /** Resolves with the exit code. */
+  wait(): Promise<number>;
+  kill(signal?: 'TERM' | 'KILL'): void;
+}
+
 /**
  * Handle to the sandbox in which the agent operates. Backed by either the
  * `process` driver (child processes in a temp dir) or the `docker` driver
@@ -40,6 +53,8 @@ export interface SandboxHandle {
   /** Working directory of the sandbox (the flow worktree mount). */
   readonly workdir: string;
   exec(command: string[], options?: SandboxExecOptions): Promise<SandboxExecResult>;
+  /** Start a long-running process with streaming stdio (CLI adapters). */
+  spawn(command: string[], options?: SandboxExecOptions): Promise<SandboxProcess>;
   readFile(path: string): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
 }

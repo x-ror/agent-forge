@@ -2,8 +2,38 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable } from '@nestjs/common';
-import type { SandboxExecOptions, SandboxExecResult } from '@agentforge/core';
+import type {
+  SandboxExecOptions,
+  SandboxExecResult,
+  SandboxProcess,
+} from '@agentforge/core';
 import type { Sandbox, SandboxDriver, SandboxOptions } from '../../domain/sandbox';
+
+/** Wraps a node child process as a streaming SandboxProcess. */
+export function wrapChildProcess(child: ReturnType<typeof spawn>): SandboxProcess {
+  function chunks(stream: NodeJS.ReadableStream | null): AsyncIterable<string> {
+    return (async function* () {
+      if (!stream) return;
+      for await (const chunk of stream) yield chunk.toString();
+    })();
+  }
+  const exit = new Promise<number>((resolve) => {
+    child.on('close', (code) => resolve(code ?? -1));
+    child.on('error', () => resolve(127));
+  });
+  return {
+    writeStdin: (data: string) => {
+      child.stdin?.write(data);
+    },
+    endStdin: () => child.stdin?.end(),
+    stdout: chunks(child.stdout),
+    stderr: chunks(child.stderr),
+    wait: () => exit,
+    kill: (signal = 'TERM') => {
+      child.kill(signal === 'KILL' ? 'SIGKILL' : 'SIGTERM');
+    },
+  };
+}
 
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
@@ -60,6 +90,17 @@ class ProcessSandbox implements Sandbox {
       if (options.stdin !== undefined) child.stdin.write(options.stdin);
       child.stdin.end();
     });
+  }
+
+  async spawn(command: string[], options: SandboxExecOptions = {}): Promise<SandboxProcess> {
+    const [cmd, ...args] = command;
+    if (!cmd) throw new Error('empty command');
+    const child = spawn(cmd, args, {
+      cwd: options.cwd ? resolveInside(this.workdir, options.cwd) : this.workdir,
+      env: { PATH: process.env.PATH ?? '', HOME: this.workdir, ...this.baseEnv, ...options.env },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return wrapChildProcess(child);
   }
 
   async readFile(p: string): Promise<string> {

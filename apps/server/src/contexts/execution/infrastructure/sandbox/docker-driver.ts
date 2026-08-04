@@ -1,9 +1,14 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { Injectable, Logger } from '@nestjs/common';
-import type { SandboxExecOptions, SandboxExecResult } from '@agentforge/core';
+import type {
+  SandboxExecOptions,
+  SandboxExecResult,
+  SandboxProcess,
+} from '@agentforge/core';
 import type { Sandbox, SandboxDriver, SandboxOptions } from '../../domain/sandbox';
+import { wrapChildProcess } from './process-driver';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_IMAGE = 'agentforge/sandbox-base';
@@ -54,6 +59,16 @@ class DockerSandbox implements Sandbox {
         child.stdin.end();
       }
     });
+  }
+
+  async spawn(command: string[], options: SandboxExecOptions = {}): Promise<SandboxProcess> {
+    const args = ['exec', '-i'];
+    for (const [key, value] of Object.entries(options.env ?? {})) {
+      args.push('-e', `${key}=${value}`);
+    }
+    args.push('-w', options.cwd ? `${WORKSPACE_MOUNT}/${options.cwd}` : WORKSPACE_MOUNT);
+    args.push(this.containerId, ...command);
+    return wrapChildProcess(spawn('docker', args, { stdio: ['pipe', 'pipe', 'pipe'] }));
   }
 
   async readFile(p: string): Promise<string> {
