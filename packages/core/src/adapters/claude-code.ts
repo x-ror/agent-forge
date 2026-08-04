@@ -202,6 +202,18 @@ class ClaudeCodeHandle implements AgentHandle {
           outcome: failed ? 'failure' : 'success',
           summary: event.result ?? '',
         });
+        // One run = one CLI turn. In stream-json input mode the CLI waits on
+        // stdin for the next user message and never exits by itself — close
+        // stdin so it terminates and the event channel drains; a later step
+        // continues the session via --resume. Keep a kill fallback in case
+        // the CLI ignores EOF.
+        try {
+          this.proc.endStdin();
+        } catch {
+          // process already gone
+        }
+        const grace = setTimeout(() => this.proc.kill('TERM'), 15_000);
+        void this.proc.wait().then(() => clearTimeout(grace));
         return;
       }
 

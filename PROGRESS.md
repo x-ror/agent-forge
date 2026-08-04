@@ -249,3 +249,24 @@ Running log per implementation-cycle prompt. Newest phase last.
 **Honest gaps vs the final acceptance demo:** step 5 of the §"Final acceptance" (canonical flow against a **real** LLM) needs a real API key — the identical path is proven by the Playwright e2e against a scripted Anthropic-protocol server, and by unit/integration coverage everywhere else. The `llm-only` sandbox network policy still degrades to `full` with a loud warning (proxy sidecar not built). Restore-from-`pg_dump` is documented and its mechanism (reconciliation) is integration-tested via FLUSHALL + worker-kill tests, but a full dump/restore drill wasn't automated.
 
 **Decisions:** prom-client, nestjs-pino/pino-http, and @nestjs/throttler added (all §13/§14-mandated capabilities); `SANDBOX_DRIVER=process` is the compose default — the docker driver needs host-visible workspace paths (docker-socket-from-container path mapping), documented as an opt-in.
+
+---
+
+## Post-ship — real-LLM acceptance via `claude-code` (done)
+
+**What ran:** the first agent runs against a **real Claude session** — the `claude-code` adapter driving the actual Claude Code CLI (subscription OAuth token, no API key), through the full production stack: `POST /runs` → outbox → worker → process sandbox in the worker container → `claude -p --input/output-format stream-json` → normalized events → SSE-visible timeline → worker-side commit on `agentforge/run-*` → cumulative-diff artifact. Run status `queued → running → succeeded` in ~20s; usage/cost captured from the CLI's result frame; final diff contains exactly the requested file.
+
+**Setup that made it work:**
+
+- `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) stored as a write-only **project secret** — adapter env comes only from `decryptedEnv(projectId)`, never from the worker's own environment.
+- Agent registered on adapter `claude-code` with `config.options.extraArgs: ["--permission-mode","acceptEdits"]` — file edits allowed headlessly; commits stay worker-side per §12.
+- Claude Code CLI baked into the server image (`npm i -g @anthropic-ai/claude-code` in the runtime stage) — the adapter preflights `claude --version` inside the sandbox, so the binary must exist in the worker image.
+
+**Bugs the real CLI caught (mock/conformance never could):**
+
+1. **Run hung forever after `result`** — in stream-json input mode the CLI waits on stdin for the next user message and never exits; the adapter's channel only ends on process exit, so the pump never finished. Fix: on `result`, `endStdin()` (+ 15s TERM fallback); resume of the same session is `--resume <sessionId>` in a later run.
+2. **CLI state committed into the run diff** — the process sandbox pointed `HOME` at the workdir (the git worktree), so `.claude.json` landed in the cumulative diff/commit. Fix: sandbox `HOME` is now a sibling `<workdir>.home` dir.
+3. **Worker died at first boot and stayed dead** — lost the race against the api's migration creating the `agentforge_app` role, exited(1), and compose had no restart policy. Fix: `restart: unless-stopped` on all five services.
+4. **nginx 502 after `up -d api`** — static `proxy_pass` pinned the api container IP at startup. Fix: `resolver 127.0.0.11` + variable `proxy_pass`, re-resolving per request (verified: api force-recreated, proxy stays 200 with no frontend restart).
+
+**Remaining gaps:** the *canonical multi-agent workflow* (implement → triage → review → PR) against a real LLM still needs an `ANTHROPIC_API_KEY` for the api-loop agents (console key; OAuth tokens don't work on `x-api-key`) — the claude-code path above proves the runtime end-to-end. `llm-only` network policy and the dump/restore drill remain as before.

@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:18
+    restart: unless-stopped
     volumes:
       # PG 18 images expect the mount at /var/lib/postgresql (not .../data).
       - pgdata:/var/lib/postgresql
@@ -15,6 +16,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     # AOF is a nice-to-have; the system survives total Redis loss (§5.4).
     # Empty requirepass = auth disabled; set REDIS_PASSWORD in .env.
     command: ['redis-server', '--appendonly', 'yes', '--requirepass', '${REDIS_PASSWORD:-}']
@@ -22,6 +24,7 @@ services:
       - redisdata:/data
 
   api:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: apps/server/Dockerfile
@@ -42,6 +45,7 @@ services:
     # no published ports — reachable only via the frontend proxy (§11.1)
 
   frontend:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
@@ -54,6 +58,7 @@ services:
       - api
 
   worker:
+    restart: unless-stopped
     image: agentforge/server:latest
     build:
       context: .

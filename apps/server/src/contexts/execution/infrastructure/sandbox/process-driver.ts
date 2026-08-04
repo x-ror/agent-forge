@@ -46,8 +46,18 @@ function resolveInside(workdir: string, p: string): string {
 class ProcessSandbox implements Sandbox {
   constructor(
     readonly workdir: string,
+    private readonly homedir: string,
     private readonly baseEnv: Record<string, string>,
   ) {}
+
+  /**
+   * HOME must live outside the workdir: the workdir is a git worktree, and
+   * agent CLIs write state files into HOME (e.g. Claude Code's .claude.json)
+   * that would otherwise be committed into the run's diff.
+   */
+  private env(extra: Record<string, string> | undefined): Record<string, string> {
+    return { PATH: process.env.PATH ?? '', HOME: this.homedir, ...this.baseEnv, ...extra };
+  }
 
   async exec(command: string[], options: SandboxExecOptions = {}): Promise<SandboxExecResult> {
     const [cmd, ...args] = command;
@@ -58,7 +68,7 @@ class ProcessSandbox implements Sandbox {
     return new Promise<SandboxExecResult>((resolve) => {
       const child = spawn(cmd, args, {
         cwd,
-        env: { PATH: process.env.PATH ?? '', HOME: this.workdir, ...this.baseEnv, ...options.env },
+        env: this.env(options.env),
         stdio: ['pipe', 'pipe', 'pipe'],
       });
       let stdout = '';
@@ -93,7 +103,7 @@ class ProcessSandbox implements Sandbox {
     if (!cmd) throw new Error('empty command');
     const child = spawn(cmd, args, {
       cwd: options.cwd ? resolveInside(this.workdir, options.cwd) : this.workdir,
-      env: { PATH: process.env.PATH ?? '', HOME: this.workdir, ...this.baseEnv, ...options.env },
+      env: this.env(options.env),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     return wrapChildProcess(child);
@@ -120,7 +130,9 @@ export class ProcessSandboxDriver implements SandboxDriver {
   readonly id = 'process' as const;
 
   async create(options: SandboxOptions): Promise<Sandbox> {
+    const homedir = `${options.workdir}.home`;
     await mkdir(options.workdir, { recursive: true });
-    return new ProcessSandbox(options.workdir, options.env ?? {});
+    await mkdir(homedir, { recursive: true });
+    return new ProcessSandbox(options.workdir, homedir, options.env ?? {});
   }
 }

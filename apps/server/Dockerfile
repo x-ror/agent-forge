@@ -15,6 +15,9 @@ RUN pnpm --filter @agentforge/core build && pnpm --filter @agentforge/server bui
 # One image, two entrypoints (§11.1): api = default CMD, worker overrides it.
 FROM node:26-slim
 RUN apt-get update && apt-get install -y --no-install-recommends git tini ca-certificates && rm -rf /var/lib/apt/lists/*
+# Claude Code CLI — required by the claude-code adapter (worker spawns `claude`
+# inside process sandboxes; without it runs on that adapter fail at preflight).
+RUN npm install -g @anthropic-ai/claude-code
 COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/docker
 WORKDIR /app
 COPY --from=build /deploy /app
