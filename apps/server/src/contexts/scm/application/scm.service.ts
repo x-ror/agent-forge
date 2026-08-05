@@ -9,7 +9,7 @@ import { PROJECT_REPOSITORY, type ProjectRepository } from '../../projects/domai
 import { SecretProvisioningService } from '../../projects/application/projects.service';
 import { ARTIFACT_REPOSITORY, type ArtifactRepository } from '../../execution/domain/repositories';
 import { parseGithubRepo, sanitizeBranchName, ScmError, type PullRequestResult, type WorktreeInfo } from '../domain/scm';
-import { GIT_PORT, GITHUB_PORT, type GitPort, type GithubPort } from '../domain/ports';
+import { GH_CLI_PORT, GIT_PORT, GITHUB_PORT, type GhCliPort, type GitPort, type GithubPort } from '../domain/ports';
 
 /**
  * Scm context (§8): per-project mirror → per-flow/per-run worktree; diffs
@@ -25,6 +25,7 @@ export class ScmService {
     @Inject(ARTIFACT_REPOSITORY) private readonly artifacts: ArtifactRepository,
     @Inject(GIT_PORT) private readonly git: GitPort,
     @Inject(GITHUB_PORT) private readonly github: GithubPort,
+    @Inject(GH_CLI_PORT) private readonly ghCli: GhCliPort,
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     private readonly secrets: SecretProvisioningService,
   ) {}
@@ -199,7 +200,11 @@ export class ScmService {
     body: string;
   }): Promise<PullRequestResult> {
     const env = await this.secrets.decryptedEnv(args.project.id);
-    const token = env.GITHUB_TOKEN ?? env.GH_TOKEN;
+    let token = env.GITHUB_TOKEN ?? env.GH_TOKEN;
+    // Local execution mode: no secret needed — borrow the host gh login.
+    if (!token && args.project.settings.executionMode === 'local') {
+      token = (await this.ghCli.token()) ?? undefined;
+    }
     const githubRepo = parseGithubRepo(args.project.repoUrl);
 
     // Push to the explicit URL: worktrees hang off a --mirror clone, whose

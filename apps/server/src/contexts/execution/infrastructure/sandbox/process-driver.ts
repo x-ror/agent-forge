@@ -130,9 +130,10 @@ export class ProcessSandboxDriver implements SandboxDriver {
   readonly id = 'process' as const;
 
   async create(options: SandboxOptions): Promise<Sandbox> {
-    const homedir = `${options.workdir}.home`;
+    // trusted (local mode): the real HOME, so CLIs see their stored logins.
+    const homedir = options.trusted && process.env.HOME ? process.env.HOME : `${options.workdir}.home`;
     await mkdir(options.workdir, { recursive: true });
-    await mkdir(homedir, { recursive: true });
+    if (!options.trusted) await mkdir(homedir, { recursive: true });
     return new ProcessSandbox(options.workdir, homedir, options.env ?? {});
   }
 }

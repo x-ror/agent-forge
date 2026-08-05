@@ -138,6 +138,9 @@ export class RunOrchestrator {
         runId: run.id,
         workdir,
         env,
+        // local mode: the CLI keeps its host login (real HOME); secrets still
+        // apply on top when present.
+        trusted: project.settings.executionMode === 'local',
         image: project.settings.sandboxImage,
         networkPolicy: project.settings.networkPolicy ?? this.env.SANDBOX_NETWORK_DEFAULT,
       });

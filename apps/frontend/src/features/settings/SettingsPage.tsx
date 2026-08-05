@@ -123,6 +123,7 @@ function EditProjectModal({ project, onClose }: { project: ProjectDto; onClose: 
   const [name, setName] = useState(project.name);
   const [repoUrl, setRepoUrl] = useState(project.repoUrl);
   const [defaultBranch, setDefaultBranch] = useState(project.defaultBranch);
+  const [executionMode, setExecutionMode] = useState<'sandbox' | 'local'>(project.settings.executionMode === 'local' ? 'local' : 'sandbox');
   return (
     <Modal
       open
@@ -131,7 +132,9 @@ function EditProjectModal({ project, onClose }: { project: ProjectDto; onClose: 
       secondaryButtonText="Cancel"
       primaryButtonDisabled={!name || !repoUrl || !defaultBranch || updateProject.isPending}
       onRequestClose={onClose}
-      onRequestSubmit={() => updateProject.mutate({ id: project.id, body: { name, repoUrl, defaultBranch } }, { onSuccess: onClose })}
+      onRequestSubmit={() =>
+        updateProject.mutate({ id: project.id, body: { name, repoUrl, defaultBranch, settings: { ...project.settings, executionMode } } }, { onSuccess: onClose })
+      }
     >
       <Stack gap={5}>
         <TextInput id="edit-project-name" labelText="Project name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -143,6 +146,16 @@ function EditProjectModal({ project, onClose }: { project: ProjectDto; onClose: 
           value={defaultBranch}
           onChange={(e) => setDefaultBranch(e.target.value)}
         />
+        <Select
+          id="edit-project-mode"
+          labelText="Execution mode"
+          helperText="Local trusts this machine: claude uses its stored login and pushes/PRs use your gh CLI — no tokens in secrets. Sandbox keeps runs isolated with secrets only."
+          value={executionMode}
+          onChange={(e) => setExecutionMode(e.target.value as 'sandbox' | 'local')}
+        >
+          <SelectItem value="sandbox" text="Sandbox — isolated, credentials from project secrets" />
+          <SelectItem value="local" text="Local — trusted: host claude + gh logins" />
+        </Select>
       </Stack>
     </Modal>
   );
@@ -169,6 +182,11 @@ function ProjectsSection() {
                   {project.id === projectId ? (
                     <Tag type="blue" size="sm">
                       selected
+                    </Tag>
+                  ) : null}
+                  {project.settings.executionMode === 'local' ? (
+                    <Tag type="teal" size="sm">
+                      local
                     </Tag>
                   ) : null}
                 </span>

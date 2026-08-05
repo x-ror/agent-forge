@@ -127,7 +127,7 @@ describe('Phase 7 e2e: tasking — sync, board, SSE, write-back', () => {
     const secretBox = new SecretBox(TEST_KEY) as SecretBoxService;
     const secretProvisioning = new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox);
     const projectRepo = new TypeormProjectRepository(ds);
-    const scm = new ScmService(env, new TypeormArtifactRepository(ds), new GitCli(), new GithubClient(), projectRepo, secretProvisioning);
+    const scm = new ScmService(env, new TypeormArtifactRepository(ds), new GitCli(), new GithubClient(), { token: async () => null }, projectRepo, secretProvisioning);
     const taskSync = new TaskSyncService(
       new TypeormTaskSourceRepository(ds),
       new TypeormTaskRepository(ds),

@@ -50,6 +50,7 @@ describe('Phase 6: Scm — mirrors, worktrees, diff, push, PR', () => {
       artifacts,
       new GitCli(),
       new GithubClient(),
+      { token: async () => null },
       new TypeormProjectRepository(ds),
       new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox),
     );

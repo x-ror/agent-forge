@@ -44,6 +44,10 @@ export const projectSettingsSchema = z
     networkPolicy: z.enum(['full', 'llm-only', 'none']).optional(),
     sandboxImage: z.string().optional(),
     defaultAgentId: z.uuid().optional(),
+    /** sandbox (default): isolated HOME, credentials from project secrets only.
+     *  local (trusted): agents inherit the host's logged-in CLIs — claude uses
+     *  its stored login, GitHub pushes/PRs resolve a token from `gh`. */
+    executionMode: z.enum(['sandbox', 'local']).optional(),
   })
   .loose();
 

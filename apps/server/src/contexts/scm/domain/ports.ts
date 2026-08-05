@@ -9,6 +9,13 @@ export interface GitPort {
 }
 export const GIT_PORT = Symbol('GitPort');
 
+/** Port: host `gh` CLI (local execution mode) — resolves the logged-in token. */
+export interface GhCliPort {
+  /** Returns the gh CLI's auth token, or null when gh is absent/logged out. */
+  token(): Promise<string | null>;
+}
+export const GH_CLI_PORT = Symbol('GhCliPort');
+
 /** Port: GitHub REST operations with worker-held tokens. */
 export interface GithubPort {
   createPullRequest(args: { apiBase?: string; token: string; repo: GithubRepo; title: string; body: string; head: string; base: string }): Promise<{ url: string; number: number }>;

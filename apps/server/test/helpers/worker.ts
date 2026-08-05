@@ -58,7 +58,15 @@ export function buildTestWorker(ds: DataSource, redisUrl: string, redisClient: R
   const secretBox = new SecretBox(env.AGENTFORGE_SECRET_KEY) as SecretBoxService;
   const secretProvisioning = new SecretProvisioningService(new TypeormSecretRepository(ds), secretBox);
 
-  const scm = new ScmService(env, new TypeormArtifactRepository(ds), new GitCli(), new GithubClient(), new TypeormProjectRepository(ds), secretProvisioning);
+  const scm = new ScmService(
+    env,
+    new TypeormArtifactRepository(ds),
+    new GitCli(),
+    new GithubClient(),
+    { token: async () => null },
+    new TypeormProjectRepository(ds),
+    secretProvisioning,
+  );
 
   const orchestrator = new RunOrchestrator(
     new TypeormRunRepository(ds),
