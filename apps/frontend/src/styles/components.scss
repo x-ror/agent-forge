@@ -24,11 +24,25 @@
   min-height: calc(100vh - 3rem); /* viewport minus the 48px header */
 }
 
+/* The picker sits in the header bar — strip the form-field chrome (gray fill
+   + underline) so it reads as part of the header, not a stray input. */
 .af-shell__project-picker {
-  width: 240px;
-  margin-right: 0.5rem;
+  width: 13rem;
   display: flex;
   align-items: center; /* center the 32px dropdown inside the 48px header */
+
+  .cds--dropdown {
+    background: transparent;
+    border-bottom: none;
+  }
+
+  .cds--dropdown:hover {
+    background: var(--cds-background-hover);
+  }
+
+  .cds--list-box__label {
+    color: var(--cds-text-primary);
+  }
 }
 
 /* ---- login / setup wizard ---- */
