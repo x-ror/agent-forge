@@ -95,3 +95,17 @@ describe('claude-code conformance', () => {
     expect(result && 'summary' in result && result.summary).toBe('resumed:sess-9');
   });
 });
+
+describe('parseDecisionLine', () => {
+  it('parses the last DECISION line from the result text', async () => {
+    const { parseDecisionLine } = await import('../src/adapters/claude-code');
+    const text = 'Analysis…\nThe format is DECISION: {"route": "example"} as instructed.\n\nDECISION: {"route": "deep", "reasoning": "touches user-facing text"}';
+    expect(parseDecisionLine(text)).toEqual({ route: 'deep', reasoning: 'touches user-facing text' });
+  });
+
+  it('returns null on missing or malformed JSON', async () => {
+    const { parseDecisionLine } = await import('../src/adapters/claude-code');
+    expect(parseDecisionLine('no decision here')).toBeNull();
+    expect(parseDecisionLine('DECISION: {route: deep}')).toBeNull();
+  });
+});

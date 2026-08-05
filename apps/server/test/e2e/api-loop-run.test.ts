@@ -72,7 +72,7 @@ describe('Phase 5 e2e: real api-loop run against a mocked LLM server', () => {
     const apiLoop = adapters.find((a) => a.id === 'api-loop');
     const claudeCode = adapters.find((a) => a.id === 'claude-code');
     expect(apiLoop?.capabilities.structuredOutput).toBe(true);
-    expect(claudeCode?.capabilities.structuredOutput).toBe(false);
+    expect(claudeCode?.capabilities.structuredOutput).toBe(true); // via DECISION-line prompt contract
   });
 
   it('completes a run end-to-end: api → outbox → worker → sandbox → events → succeeded', async () => {

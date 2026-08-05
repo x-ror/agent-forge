@@ -47,6 +47,24 @@ interface StreamJsonEvent {
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
+/**
+ * Adapter-agnostic decisions: parse a mandatory `DECISION: {...}` line out of
+ * the final result text (last occurrence wins — earlier mentions may be the
+ * agent quoting the instructions).
+ */
+export function parseDecisionLine(text: string): Json | null {
+  const matches = [...text.matchAll(/DECISION:\s*(\{.*\})/g)];
+  const last = matches.at(-1);
+  if (!last) return null;
+  try {
+    const parsed: unknown = JSON.parse(last[1]!);
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Json;
+  } catch {
+    // fall through — engine-side coercion still scans the summary text
+  }
+  return null;
+}
+
 class ClaudeCodeHandle implements AgentHandle {
   private readonly channel = new EventChannel();
   readonly events = this.channel.events;
@@ -59,6 +77,7 @@ class ClaudeCodeHandle implements AgentHandle {
   constructor(
     private readonly proc: SandboxProcess,
     resumeSessionId: string | null,
+    private readonly expectDecision: boolean,
   ) {
     this.sessionId = resumeSessionId;
     void this.readLoop();
@@ -197,10 +216,12 @@ class ClaudeCodeHandle implements AgentHandle {
           });
         }
         const failed = (event.is_error ?? false) || event.subtype !== 'success';
+        const structured = this.expectDecision && !failed ? parseDecisionLine(event.result ?? '') : null;
         this.channel.push({
           type: 'result',
           outcome: failed ? 'failure' : 'success',
           summary: event.result ?? '',
+          ...(structured !== null ? { structured } : {}),
         });
         // One run = one CLI turn. In stream-json input mode the CLI waits on
         // stdin for the next user message and never exits by itself — close
@@ -230,7 +251,9 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     permissionGates: true,
     resume: true,
     costReporting: true,
-    structuredOutput: false,
+    // Via prompt contract: decision runs demand a final `DECISION: {...}`
+    // line, parsed from the result text.
+    structuredOutput: true,
   };
 
   async start(ctx: RunContext): Promise<AgentHandle> {
@@ -264,10 +287,15 @@ export class ClaudeCodeAdapter implements AgentAdapter {
       ...options.extraArgs,
     ];
     const proc = await ctx.sandbox.spawn(args, { env: ctx.env });
-    const handle = new ClaudeCodeHandle(proc, resumeSessionId);
+    const handle = new ClaudeCodeHandle(proc, resumeSessionId, Boolean(ctx.structured));
     // Repo-imported agents store their full markdown brief in config.systemPrompt.
     const systemPrompt = typeof ctx.config.systemPrompt === 'string' && ctx.config.systemPrompt.trim().length > 0 ? ctx.config.systemPrompt.trim() : null;
-    const prompt = systemPrompt ? `# Agent instructions\n\n${systemPrompt}\n\n---\n\n# Task\n\n${ctx.prompt}` : ctx.prompt;
+    let prompt = systemPrompt ? `# Agent instructions\n\n${systemPrompt}\n\n---\n\n# Task\n\n${ctx.prompt}` : ctx.prompt;
+    if (ctx.structured) {
+      prompt += `\n\n---\n\n# Answer format (mandatory)\n\nThis is a decision task. After your analysis, end your final reply with exactly one line:\n\nDECISION: {"route": "<one of: ${ctx.structured.routes.join(
+        ', ',
+      )}>", "reasoning": "<one concise sentence>"}\n\nThe route value must be exactly one of: ${ctx.structured.routes.join(', ')}.`;
+    }
     handle.sendInitialPrompt(prompt);
     return handle;
   }
