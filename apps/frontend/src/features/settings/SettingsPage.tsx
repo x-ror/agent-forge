@@ -531,7 +531,7 @@ function SourcesSection() {
           <Select id="source-kind" labelText="Source kind" value={kind} onChange={(e) => setKind(e.target.value)}>
             <SelectItem value="github_issues" text="GitHub Issues" />
             <SelectItem value="file" text="Tracked file (TASKS.md)" />
-            <SelectItem value="jira" text="Jira (stub)" />
+            <SelectItem value="jira" text="Jira" />
           </Select>
           <Button type="submit" size="sm" disabled={createSource.isPending}>
             Add source

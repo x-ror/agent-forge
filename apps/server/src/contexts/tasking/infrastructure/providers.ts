@@ -120,12 +120,66 @@ export class FileTasksProvider implements TaskSourceProvider {
   }
 }
 
-/** Jira: stub interface per the phase plan — wire config now, implement later. */
+/**
+ * Jira → tasks. Works against Jira Cloud (Basic auth: JIRA_EMAIL +
+ * JIRA_API_TOKEN secrets) and self-hosted Server/DC (Bearer PAT: just
+ * JIRA_API_TOKEN). Config: { jql?: string; project?: string } — jql wins;
+ * project scopes the default "my open issues" query.
+ */
 @Injectable()
 export class JiraProvider implements TaskSourceProvider {
   readonly kind = 'jira' as const;
 
-  async fetch(): Promise<TaskSourceFetch> {
-    throw new Error('jira task source is not implemented yet (v1 stub)');
+  async fetch(source: TaskSource, ctx: TaskSourceProviderContext): Promise<TaskSourceFetch> {
+    const config = source.config as { jql?: string; project?: string };
+    const base = (ctx.env.JIRA_BASE_URL ?? '').replace(/\/$/, '');
+    if (!base) throw new Error('jira source: set the JIRA_BASE_URL project secret (e.g. https://yourco.atlassian.net or your self-hosted URL)');
+    const token = ctx.env.JIRA_API_TOKEN ?? ctx.env.JIRA_TOKEN;
+    if (!token) throw new Error('jira source: set the JIRA_API_TOKEN project secret (+ JIRA_EMAIL for Jira Cloud)');
+    const email = ctx.env.JIRA_EMAIL;
+    const authorization = email ? `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}` : `Bearer ${token}`;
+
+    const jql =
+      config.jql ??
+      (config.project
+        ? `project = ${config.project} AND statusCategory != Done ORDER BY created DESC`
+        : 'assignee = currentUser() AND statusCategory != Done ORDER BY created DESC');
+
+    const tasks: ExternalTask[] = [];
+    const maxResults = 100;
+    let startAt = 0;
+    let complete = false;
+    for (let page = 0; page < 10; page += 1) {
+      const params = new URLSearchParams({ jql, startAt: String(startAt), maxResults: String(maxResults), fields: 'summary,description,labels,created' });
+      const res = await fetch(`${base}/rest/api/2/search?${params.toString()}`, {
+        headers: { accept: 'application/json', authorization },
+      });
+      if (!res.ok) {
+        throw new Error(`jira search failed: ${res.status} ${(await res.text()).slice(0, 300)}`);
+      }
+      const data = (await res.json()) as {
+        total: number;
+        issues: Array<{ key: string; fields: { summary: string; description?: unknown; labels?: string[]; created?: string } }>;
+      };
+      for (const issue of data.issues) {
+        tasks.push({
+          externalKey: issue.key,
+          title: issue.fields.summary,
+          // API v2 returns wiki/plain text; Cloud v3 would return ADF objects.
+          body: typeof issue.fields.description === 'string' ? issue.fields.description : '',
+          ...(issue.fields.created ? { createdAt: issue.fields.created } : {}),
+          meta: {
+            url: `${base}/browse/${issue.key}`,
+            labels: issue.fields.labels ?? [],
+          } as { [key: string]: Json },
+        });
+      }
+      startAt += data.issues.length;
+      if (data.issues.length === 0 || startAt >= data.total) {
+        complete = true;
+        break;
+      }
+    }
+    return { tasks, complete };
   }
 }
