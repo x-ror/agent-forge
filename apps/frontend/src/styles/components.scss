@@ -333,9 +333,11 @@
   gap: 0.5rem;
 }
 
-/* Carbon positions trailing button icons at a fixed offset tuned for the
-   48px button — in sm (32px) buttons they sit visibly low. Center them. */
-.cds--btn--sm:not(.cds--btn--icon-only) .cds--btn__icon {
+/* Carbon absolutely-positions trailing button icons at a fixed offset tuned
+   for the 48px button — in sm (32px) buttons they sit visibly low. Center
+   them. Ghost buttons are excluded: their icons are static flex children and
+   already centered (a transform would shove them to the top edge). */
+.cds--btn--sm:not(.cds--btn--icon-only):not(.cds--btn--ghost) .cds--btn__icon {
   inset-block-start: 50%;
   transform: translateY(-50%);
 }
