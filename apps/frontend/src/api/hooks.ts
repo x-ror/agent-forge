@@ -3,6 +3,8 @@ import type {
   AgentDto,
   CreateAgentRequest,
   CreateProjectRequest,
+  UpdateAgentRequest,
+  UpdateProjectRequest,
   CreateTaskRequest,
   CreateTaskSourceRequest,
   FlowRunDto,
@@ -60,6 +62,14 @@ export function useCreateProject() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateProjectRequest) => api.post<ProjectDto>('/projects', body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}
+
+export function useUpdateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { id: string; body: UpdateProjectRequest }) => api.patch<ProjectDto>(`/projects/${args.id}`, args.body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['projects'] }),
   });
 }
@@ -145,6 +155,14 @@ export function useCreateAgent() {
   });
 }
 
+export function useUpdateAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { id: string; body: UpdateAgentRequest }) => api.patch<AgentDto>(`/agents/${args.id}`, args.body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['agents'] }),
+  });
+}
+
 export function useDeleteAgent() {
   const qc = useQueryClient();
   return useMutation({
@@ -186,6 +204,14 @@ export function useCreateTaskSource() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateTaskSourceRequest) => api.post<TaskSourceDto>('/task-sources', body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['task-sources'] }),
+  });
+}
+
+export function useDeleteTaskSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/task-sources/${id}`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['task-sources'] }),
   });
 }
@@ -313,6 +339,14 @@ export type { RunEventDto, PatDto };
 
 export function usePats() {
   return useQuery({ queryKey: ['pats'], queryFn: () => api.get<PatDto[]>('/pats') });
+}
+
+export function useRevokePat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/pats/${id}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['pats'] }),
+  });
 }
 
 export function useCreatePat() {

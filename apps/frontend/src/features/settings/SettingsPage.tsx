@@ -3,6 +3,7 @@ import {
   AccordionItem,
   Button,
   CodeSnippet,
+  ComboBox,
   Form,
   InlineLoading,
   InlineNotification,
@@ -20,11 +21,12 @@ import {
   TabPanels,
   Tabs,
   Tag,
+  TextArea,
   TextInput,
 } from '@carbon/react';
-import { TrashCan, View } from '@carbon/icons-react';
+import { Edit, TrashCan, View } from '@carbon/icons-react';
 import { useState } from 'react';
-import type { RepoAgentDto } from '@agentforge/core';
+import type { AgentDto, ProjectDto, RepoAgentDto } from '@agentforge/core';
 import { formatDateTime, sourceKindLabel } from '../../components/format';
 import { MarkdownView } from '../../components/MarkdownView';
 import {
@@ -37,14 +39,65 @@ import {
   useDeleteAgent,
   useDeleteProject,
   useDeleteSecret,
+  useDeleteTaskSource,
   usePats,
   useProjects,
   usePutSecret,
   useRepoAgents,
+  useRevokePat,
   useSecretKeys,
   useTaskSources,
+  useUpdateAgent,
+  useUpdateProject,
 } from '../../api/hooks';
 import { useAppState } from '../../state/app-state';
+
+/** Prefilled model ids — the ComboBox also accepts any custom value. */
+const MODEL_OPTIONS = ['claude-opus-5', 'claude-sonnet-5', 'claude-opus-4-8', 'claude-haiku-4-5'];
+
+function ModelPicker({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <ComboBox
+      id={id}
+      titleText="Model (optional — pick or type a custom id)"
+      items={MODEL_OPTIONS}
+      allowCustomValue
+      selectedItem={value || null}
+      onChange={({ selectedItem }) => onChange(selectedItem ?? '')}
+      onInputChange={(text) => onChange(text ?? '')}
+    />
+  );
+}
+
+function EditProjectModal({ project, onClose }: { project: ProjectDto; onClose: () => void }) {
+  const updateProject = useUpdateProject();
+  const [name, setName] = useState(project.name);
+  const [repoUrl, setRepoUrl] = useState(project.repoUrl);
+  const [defaultBranch, setDefaultBranch] = useState(project.defaultBranch);
+  return (
+    <Modal
+      open
+      modalHeading={`Edit project “${project.name}”`}
+      primaryButtonText="Save"
+      secondaryButtonText="Cancel"
+      primaryButtonDisabled={!name || !repoUrl || !defaultBranch || updateProject.isPending}
+      onRequestClose={onClose}
+      onRequestSubmit={() => updateProject.mutate({ id: project.id, body: { name, repoUrl, defaultBranch } }, { onSuccess: onClose })}
+    >
+      <Stack gap={5}>
+        <TextInput id="edit-project-name" labelText="Project name" value={name} onChange={(e) => setName(e.target.value)} />
+        <TextInput id="edit-project-repo" labelText="Repository URL" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} />
+        <TextInput
+          id="edit-project-branch"
+          labelText="Default branch"
+          helperText="Base for flow worktrees and PRs — must exist in the repo (main vs master)."
+          value={defaultBranch}
+          onChange={(e) => setDefaultBranch(e.target.value)}
+        />
+      </Stack>
+    </Modal>
+  );
+}
 
 function ProjectsSection() {
   const projects = useProjects();
@@ -54,6 +107,7 @@ function ProjectsSection() {
   const [name, setName] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [editing, setEditing] = useState<ProjectDto | null>(null);
   return (
     <Stack gap={5}>
       <StructuredListWrapper>
@@ -70,8 +124,11 @@ function ProjectsSection() {
                   ) : null}
                 </span>
               </StructuredListCell>
-              <StructuredListCell>{project.repoUrl}</StructuredListCell>
               <StructuredListCell>
+                {project.repoUrl} <span className="af-settings__muted">({project.defaultBranch})</span>
+              </StructuredListCell>
+              <StructuredListCell className="af-cell--nowrap">
+                <Button kind="ghost" size="sm" renderIcon={Edit} iconDescription="Edit project" hasIconOnly onClick={() => setEditing(project)} />
                 <Button
                   kind="danger--ghost"
                   size="sm"
@@ -86,6 +143,7 @@ function ProjectsSection() {
           ))}
         </StructuredListBody>
       </StructuredListWrapper>
+      {editing && <EditProjectModal project={editing} onClose={() => setEditing(null)} />}
       {pendingDelete && (
         <Modal
           open
@@ -139,11 +197,71 @@ function ProjectsSection() {
   );
 }
 
+function EditAgentModal({ agent, onClose }: { agent: AgentDto; onClose: () => void }) {
+  const adapters = useAdapters();
+  const updateAgent = useUpdateAgent();
+  const [adapter, setAdapter] = useState<string>(agent.adapter);
+  const [model, setModel] = useState(typeof agent.config.model === 'string' ? agent.config.model : '');
+  const [systemPrompt, setSystemPrompt] = useState(typeof agent.config.systemPrompt === 'string' ? agent.config.systemPrompt : '');
+  const [optionsJson, setOptionsJson] = useState(agent.config.options ? JSON.stringify(agent.config.options) : '');
+  const [error, setError] = useState<string | null>(null);
+  const specialists = Array.isArray(agent.config.specialists) ? (agent.config.specialists as string[]) : [];
+
+  const save = () => {
+    setError(null);
+    let options: Record<string, unknown> | undefined;
+    try {
+      options = optionsJson.trim() ? (JSON.parse(optionsJson) as Record<string, unknown>) : undefined;
+    } catch {
+      setError('Adapter options must be valid JSON');
+      return;
+    }
+    const config: Record<string, unknown> = { ...agent.config };
+    if (model.trim()) config.model = model.trim();
+    else delete config.model;
+    if (systemPrompt.trim()) config.systemPrompt = systemPrompt;
+    else delete config.systemPrompt;
+    if (options) config.options = options;
+    else delete config.options;
+    updateAgent.mutate(
+      { id: agent.id, body: { adapter: adapter as never, config } },
+      { onSuccess: onClose, onError: (e) => setError(e instanceof Error ? e.message : 'Update failed') },
+    );
+  };
+
+  return (
+    <Modal
+      open
+      size="lg"
+      modalHeading={`Edit agent “${agent.name}”`}
+      primaryButtonText="Save"
+      secondaryButtonText="Cancel"
+      primaryButtonDisabled={updateAgent.isPending}
+      onRequestClose={onClose}
+      onRequestSubmit={save}
+    >
+      <Stack gap={5}>
+        {error && <InlineNotification kind="error" lowContrast title="Could not save" subtitle={error} onClose={() => setError(null)} />}
+        <Select id="edit-agent-adapter" labelText="Adapter" value={adapter} onChange={(e) => setAdapter(e.target.value)}>
+          {(adapters.data ?? []).map((item) => (
+            <SelectItem key={item.id} value={item.id} text={item.id} />
+          ))}
+        </Select>
+        <ModelPicker id="edit-agent-model" value={model} onChange={setModel} />
+        <TextInput id="edit-agent-options" labelText="Adapter options JSON (optional)" value={optionsJson} onChange={(e) => setOptionsJson(e.target.value)} />
+        {specialists.length > 0 && <p className="af-settings__tab-desc">Attached specialists: {specialists.join(', ')} — their briefs live inside the system prompt below.</p>}
+        <TextArea id="edit-agent-prompt" labelText="System prompt" rows={12} value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} />
+      </Stack>
+    </Modal>
+  );
+}
+
 function AgentsSection() {
   const agents = useAgents();
   const adapters = useAdapters();
   const createAgent = useCreateAgent();
   const deleteAgent = useDeleteAgent();
+  const [editing, setEditing] = useState<AgentDto | null>(null);
   const { projectId } = useAppState();
   const repoAgents = useRepoAgents(projectId);
   const [name, setName] = useState('');
@@ -195,21 +313,33 @@ function AgentsSection() {
           {(agents.data ?? []).map((agent) => (
             <StructuredListRow key={agent.id}>
               <StructuredListCell>{agent.name}</StructuredListCell>
-              <StructuredListCell>{agent.adapter}</StructuredListCell>
-              <StructuredListCell>
-                {typeof agent.config.systemPrompt === 'string' && agent.config.systemPrompt.length > 0 ? (
-                  <Tag type="green">has system prompt</Tag>
-                ) : (
-                  <Tag type="gray">default prompt</Tag>
-                )}
+              <StructuredListCell className="af-cell--nowrap">
+                {agent.adapter}
+                {typeof agent.config.model === 'string' ? <span className="af-settings__muted"> · {agent.config.model}</span> : null}
               </StructuredListCell>
               <StructuredListCell>
+                <span className="af-settings__tag-row">
+                  {typeof agent.config.systemPrompt === 'string' && agent.config.systemPrompt.length > 0 ? (
+                    <Tag type="green">has system prompt</Tag>
+                  ) : (
+                    <Tag type="gray">default prompt</Tag>
+                  )}
+                  {Array.isArray(agent.config.specialists) && agent.config.specialists.length > 0 ? (
+                    <Tag type="purple">
+                      {agent.config.specialists.length} specialist{agent.config.specialists.length === 1 ? '' : 's'}
+                    </Tag>
+                  ) : null}
+                </span>
+              </StructuredListCell>
+              <StructuredListCell className="af-cell--nowrap">
+                <Button kind="ghost" size="sm" renderIcon={Edit} iconDescription="Edit agent" hasIconOnly onClick={() => setEditing(agent)} />
                 <Button kind="danger--ghost" size="sm" renderIcon={TrashCan} iconDescription="Delete" hasIconOnly onClick={() => deleteAgent.mutate(agent.id)} />
               </StructuredListCell>
             </StructuredListRow>
           ))}
         </StructuredListBody>
       </StructuredListWrapper>
+      {editing && <EditAgentModal agent={editing} onClose={() => setEditing(null)} />}
       <Form
         aria-label="new agent"
         onSubmit={(e) => {
@@ -256,9 +386,11 @@ function AgentsSection() {
               onChange={(e) => applyRepoImport(e.target.value)}
             >
               <SelectItem value="" text="— none —" />
-              {(repoAgents.data ?? []).map((a) => (
-                <SelectItem key={`${a.kind}:${a.name}`} value={a.name} text={`${a.name} (${a.kind})`} />
-              ))}
+              {(repoAgents.data ?? [])
+                .filter((a) => a.kind === 'agent')
+                .map((a) => (
+                  <SelectItem key={`${a.kind}:${a.name}`} value={a.name} text={a.name} />
+                ))}
             </Select>
           )}
           <TextInput id="agent-name" labelText="Agent name (referenced by workflows)" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -267,7 +399,7 @@ function AgentsSection() {
               <SelectItem key={item.id} value={item.id} text={item.id} />
             ))}
           </Select>
-          <TextInput id="agent-model" labelText="Model (optional)" value={model} onChange={(e) => setModel(e.target.value)} />
+          <ModelPicker id="agent-model" value={model} onChange={setModel} />
           <TextInput
             id="agent-options"
             labelText='Adapter options JSON (optional, e.g. {"extraArgs":["--permission-mode","acceptEdits"]})'
@@ -293,6 +425,7 @@ function SourcesSection() {
   const { projectId } = useAppState();
   const sources = useTaskSources(projectId);
   const createSource = useCreateTaskSource();
+  const deleteSource = useDeleteTaskSource();
   const [kind, setKind] = useState('github_issues');
   if (!projectId) return <p>Select a project first.</p>;
   return (
@@ -303,6 +436,17 @@ function SourcesSection() {
             <StructuredListRow key={source.id}>
               <StructuredListCell>{sourceKindLabel(source.kind)}</StructuredListCell>
               <StructuredListCell className="af-cell--nowrap">{source.lastSyncedAt ? `synced ${formatDateTime(source.lastSyncedAt)}` : 'never synced'}</StructuredListCell>
+              <StructuredListCell className="af-cell--nowrap">
+                <Button
+                  kind="danger--ghost"
+                  size="sm"
+                  renderIcon={TrashCan}
+                  iconDescription="Delete source"
+                  hasIconOnly
+                  disabled={deleteSource.isPending}
+                  onClick={() => deleteSource.mutate(source.id)}
+                />
+              </StructuredListCell>
             </StructuredListRow>
           ))}
         </StructuredListBody>
@@ -424,9 +568,11 @@ function RepoAgentsSection() {
   const runtimeAgents = useAgents();
   const adapters = useAdapters();
   const createAgent = useCreateAgent();
+  const updateAgent = useUpdateAgent();
   const [selected, setSelected] = useState<RepoAgentDto | null>(null);
   const [viewMode, setViewMode] = useState<'pretty' | 'raw'>('pretty');
   const [importAdapter, setImportAdapter] = useState('claude-code');
+  const [attachTo, setAttachTo] = useState('');
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [importErr, setImportErr] = useState<string | null>(null);
 
@@ -476,6 +622,40 @@ function RepoAgentsSection() {
       {
         onSuccess: () => setImportMsg(`Registered “${agent.name}” (${adapterId}). Pick it by name on the workflow canvas.`),
         onError: (err) => setImportErr(err instanceof Error ? err.message : 'Import failed'),
+      },
+    );
+  };
+
+  // Specialists don't stand alone on the canvas — their brief joins a runtime
+  // agent's system prompt, recorded in config.specialists.
+  const attachSpecialist = (specialist: RepoAgentDto, agentName: string) => {
+    setImportMsg(null);
+    setImportErr(null);
+    const target = (runtimeAgents.data ?? []).find((a) => a.name === agentName);
+    if (!target) {
+      setImportErr('Pick a runtime agent to attach to.');
+      return;
+    }
+    const existing = Array.isArray(target.config.specialists) ? (target.config.specialists as string[]) : [];
+    if (existing.includes(specialist.name)) {
+      setImportErr(`“${specialist.name}” is already attached to ${target.name}.`);
+      return;
+    }
+    const basePrompt = typeof target.config.systemPrompt === 'string' ? target.config.systemPrompt : '';
+    updateAgent.mutate(
+      {
+        id: target.id,
+        body: {
+          config: {
+            ...target.config,
+            systemPrompt: `${basePrompt}\n\n---\n\n# Specialist: ${specialist.name}\n\n${specialist.description}`.trim(),
+            specialists: [...existing, specialist.name],
+          },
+        },
+      },
+      {
+        onSuccess: () => setImportMsg(`Attached specialist “${specialist.name}” to ${target.name} — its brief is now part of that agent's system prompt.`),
+        onError: (err) => setImportErr(err instanceof Error ? err.message : 'Attach failed'),
       },
     );
   };
@@ -549,16 +729,36 @@ function RepoAgentsSection() {
               </Button>
             </div>
             {viewMode === 'pretty' ? <MarkdownView source={selected.description} /> : <pre className="af-md-raw">{selected.description}</pre>}
-            <Stack gap={3}>
-              <Select id="import-adapter" labelText="Runtime adapter for import" value={importAdapter} onChange={(e) => setImportAdapter(e.target.value)}>
-                {(adapters.data ?? []).map((item) => (
-                  <SelectItem key={item.id} value={item.id} text={item.id} />
-                ))}
-              </Select>
-              <Button size="sm" disabled={createAgent.isPending || registeredNames.has(selected.name)} onClick={() => importAsRuntime(selected, importAdapter)}>
-                {registeredNames.has(selected.name) ? 'Already registered' : 'Import as runtime agent'}
-              </Button>
-            </Stack>
+            {selected.kind === 'specialist' ? (
+              <Stack gap={3}>
+                <Select
+                  id="attach-agent"
+                  labelText="Attach to runtime agent"
+                  helperText="Specialists don't appear on the canvas — their brief becomes part of an agent's system prompt."
+                  value={attachTo}
+                  onChange={(e) => setAttachTo(e.target.value)}
+                >
+                  <SelectItem value="" text="— pick an agent —" />
+                  {(runtimeAgents.data ?? []).map((a) => (
+                    <SelectItem key={a.id} value={a.name} text={`${a.name} (${a.adapter})`} />
+                  ))}
+                </Select>
+                <Button size="sm" disabled={updateAgent.isPending || !attachTo} onClick={() => attachSpecialist(selected, attachTo)}>
+                  Attach specialist
+                </Button>
+              </Stack>
+            ) : (
+              <Stack gap={3}>
+                <Select id="import-adapter" labelText="Runtime adapter for import" value={importAdapter} onChange={(e) => setImportAdapter(e.target.value)}>
+                  {(adapters.data ?? []).map((item) => (
+                    <SelectItem key={item.id} value={item.id} text={item.id} />
+                  ))}
+                </Select>
+                <Button size="sm" disabled={createAgent.isPending || registeredNames.has(selected.name)} onClick={() => importAsRuntime(selected, importAdapter)}>
+                  {registeredNames.has(selected.name) ? 'Already registered' : 'Import as runtime agent'}
+                </Button>
+              </Stack>
+            )}
           </Stack>
         </Modal>
       )}
@@ -569,6 +769,7 @@ function RepoAgentsSection() {
 function PatsSection() {
   const pats = usePats();
   const createPat = useCreatePat();
+  const revokePat = useRevokePat();
   const [name, setName] = useState('');
   const [token, setToken] = useState<string | null>(null);
   return (
@@ -584,6 +785,13 @@ function PatsSection() {
             <StructuredListRow key={pat.id}>
               <StructuredListCell>{pat.name}</StructuredListCell>
               <StructuredListCell>{pat.revokedAt ? 'revoked' : 'active'}</StructuredListCell>
+              <StructuredListCell className="af-cell--nowrap">
+                {!pat.revokedAt && (
+                  <Button kind="danger--ghost" size="sm" disabled={revokePat.isPending} onClick={() => revokePat.mutate(pat.id)}>
+                    Revoke
+                  </Button>
+                )}
+              </StructuredListCell>
             </StructuredListRow>
           ))}
         </StructuredListBody>
