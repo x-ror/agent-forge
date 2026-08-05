@@ -4,7 +4,7 @@ import { parseGithubRepo } from '../../scm/domain/scm';
 import { GIT_PORT, type GitPort } from '../../scm/domain/ports';
 import { ScmService } from '../../scm/application/scm.service';
 import type { TaskSource } from '../domain/task';
-import type { ExternalTask, TaskSourceProvider, TaskSourceProviderContext } from '../domain/ports';
+import type { ExternalTask, TaskSourceFetch, TaskSourceProvider, TaskSourceProviderContext } from '../domain/ports';
 
 function slugKey(title: string): string {
   return title
@@ -39,7 +39,7 @@ export function parseFileTasksMarkdown(content: string, filePath: string): Exter
 export class GithubIssuesProvider implements TaskSourceProvider {
   readonly kind = 'github_issues' as const;
 
-  async fetch(source: TaskSource, ctx: TaskSourceProviderContext): Promise<ExternalTask[]> {
+  async fetch(source: TaskSource, ctx: TaskSourceProviderContext): Promise<TaskSourceFetch> {
     const config = source.config as { repo?: string; labels?: string[] };
     const parsed = config.repo ? { owner: config.repo.split('/')[0]!, repo: config.repo.split('/')[1]! } : parseGithubRepo(ctx.projectRepoUrl);
     if (!parsed) {
@@ -48,41 +48,53 @@ export class GithubIssuesProvider implements TaskSourceProvider {
     const token = ctx.env.GITHUB_TOKEN ?? ctx.env.GH_TOKEN;
     const apiBase = ((ctx.projectSettings.githubApiUrl as string | undefined) ?? 'https://api.github.com').replace(/\/$/, '');
 
-    const params = new URLSearchParams({ state: 'open', per_page: '100' });
-    if (config.labels?.length) params.set('labels', config.labels.join(','));
-    const res = await fetch(`${apiBase}/repos/${parsed.owner}/${parsed.repo}/issues?${params.toString()}`, {
-      headers: {
-        accept: 'application/vnd.github+json',
-        'user-agent': 'agentforge',
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) {
-      throw new Error(`github issues fetch failed: ${res.status} ${await res.text()}`);
-    }
-    const issues = (await res.json()) as Array<{
-      number: number;
-      title: string;
-      body: string | null;
-      html_url: string;
-      labels: Array<{ name: string }>;
-      pull_request?: unknown;
-      created_at?: string;
-    }>;
+    const perPage = 100;
+    const maxPages = 10; // 1000 open issues — beyond that we refuse to claim completeness
+    const tasks: ExternalTask[] = [];
+    let complete = false;
+    for (let page = 1; page <= maxPages; page += 1) {
+      const params = new URLSearchParams({ state: 'open', per_page: String(perPage), page: String(page) });
+      if (config.labels?.length) params.set('labels', config.labels.join(','));
+      const res = await fetch(`${apiBase}/repos/${parsed.owner}/${parsed.repo}/issues?${params.toString()}`, {
+        headers: {
+          accept: 'application/vnd.github+json',
+          'user-agent': 'agentforge',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`github issues fetch failed: ${res.status} ${await res.text()}`);
+      }
+      const issues = (await res.json()) as Array<{
+        number: number;
+        title: string;
+        body: string | null;
+        html_url: string;
+        labels: Array<{ name: string }>;
+        pull_request?: unknown;
+        created_at?: string;
+      }>;
 
-    return issues
-      .filter((issue) => !issue.pull_request) // the issues API also returns PRs
-      .map((issue) => ({
-        externalKey: `${parsed.owner}/${parsed.repo}#${issue.number}`,
-        title: issue.title,
-        body: issue.body ?? '',
-        ...(issue.created_at ? { createdAt: issue.created_at } : {}),
-        meta: {
-          url: issue.html_url,
-          number: issue.number,
-          labels: issue.labels.map((l) => l.name),
-        } as { [key: string]: Json },
-      }));
+      for (const issue of issues) {
+        if (issue.pull_request) continue; // the issues API also returns PRs
+        tasks.push({
+          externalKey: `${parsed.owner}/${parsed.repo}#${issue.number}`,
+          title: issue.title,
+          body: issue.body ?? '',
+          ...(issue.created_at ? { createdAt: issue.created_at } : {}),
+          meta: {
+            url: issue.html_url,
+            number: issue.number,
+            labels: issue.labels.map((l) => l.name),
+          } as { [key: string]: Json },
+        });
+      }
+      if (issues.length < perPage) {
+        complete = true;
+        break;
+      }
+    }
+    return { tasks, complete };
   }
 }
 
@@ -99,12 +111,12 @@ export class FileTasksProvider implements TaskSourceProvider {
     @Inject(GIT_PORT) private readonly git: GitPort,
   ) {}
 
-  async fetch(source: TaskSource, ctx: TaskSourceProviderContext): Promise<ExternalTask[]> {
+  async fetch(source: TaskSource, ctx: TaskSourceProviderContext): Promise<TaskSourceFetch> {
     const config = source.config as { path?: string; ref?: string };
     const filePath = config.path ?? 'TASKS.md';
     const mirror = await this.scm.ensureMirror({ id: ctx.projectId, repoUrl: ctx.projectRepoUrl });
     const { stdout } = await this.git.run(['-C', mirror, 'show', `${config.ref ?? 'HEAD'}:${filePath}`]);
-    return parseFileTasksMarkdown(stdout, filePath);
+    return { tasks: parseFileTasksMarkdown(stdout, filePath), complete: true };
   }
 }
 
@@ -113,7 +125,7 @@ export class FileTasksProvider implements TaskSourceProvider {
 export class JiraProvider implements TaskSourceProvider {
   readonly kind = 'jira' as const;
 
-  async fetch(): Promise<ExternalTask[]> {
+  async fetch(): Promise<TaskSourceFetch> {
     throw new Error('jira task source is not implemented yet (v1 stub)');
   }
 }

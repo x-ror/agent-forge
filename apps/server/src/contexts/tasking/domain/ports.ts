@@ -19,10 +19,17 @@ export interface TaskSourceProviderContext {
   projectId: string;
 }
 
+export interface TaskSourceFetch {
+  tasks: ExternalTask[];
+  /** True when the fetch saw the source's complete current set — required
+   *  before reconciliation may mark absent tasks as done. */
+  complete: boolean;
+}
+
 /** Port: one per source kind; fetches the current external task list. */
 export interface TaskSourceProvider {
   readonly kind: TaskSourceKind;
-  fetch(source: TaskSource, ctx: TaskSourceProviderContext): Promise<ExternalTask[]>;
+  fetch(source: TaskSource, ctx: TaskSourceProviderContext): Promise<TaskSourceFetch>;
 }
 
 export const TASK_SOURCE_PROVIDERS = Symbol('TaskSourceProviders');

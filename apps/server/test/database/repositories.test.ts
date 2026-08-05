@@ -216,6 +216,23 @@ describe('repository round-trips', () => {
     const afterPlain = await tasks.findById(id1);
     expect(afterPlain?.createdAt.toISOString()).toBe(sourceCreatedAt.toISOString());
 
+    // Reconciliation: tasks absent from the current external set retire
+    // backlog/failed → done; in_flow stays untouched.
+    const goneId = await tasks.upsertSynced({
+      id: uuidv7(),
+      projectId,
+      sourceId,
+      externalKey: 'o/r#2',
+      title: 'closed at source',
+      body: '',
+      status: 'backlog',
+      meta: {},
+    });
+    const closed = await tasks.markMissingAsDone(sourceId, ['o/r#1']);
+    expect(closed).toBe(1);
+    expect((await tasks.findById(goneId))?.status).toBe('done');
+    expect((await tasks.findById(id1))?.status).toBe('in_flow'); // absent but in_flow — untouched
+
     const board = await tasks.listBoard(projectId, { status: 'in_flow' });
     expect(board.some((t) => t.id === id1)).toBe(true);
   });

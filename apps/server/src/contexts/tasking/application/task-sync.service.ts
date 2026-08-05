@@ -35,7 +35,7 @@ export class TaskSyncService {
     const provider = this.providers.find((p) => p.kind === source.kind);
     if (!provider) throw new Error(`no provider for task source kind '${source.kind}'`);
 
-    const external = await provider.fetch(source, {
+    const { tasks: external, complete } = await provider.fetch(source, {
       env: await this.secrets.decryptedEnv(project.id),
       projectRepoUrl: project.repoUrl,
       projectSettings: project.settings,
@@ -58,6 +58,20 @@ export class TaskSyncService {
       upserted += 1;
     }
 
+    // Close the loop: a task whose external counterpart vanished (issue
+    // closed, checklist item checked/removed) moves backlog/failed → done.
+    // Only when the fetch was provably complete — a truncated page must
+    // never retire live work.
+    let closed = 0;
+    if (complete) {
+      closed = await this.tasks.markMissingAsDone(
+        source.id,
+        external.map((t) => t.externalKey),
+      );
+    } else {
+      this.logger.warn(`sync ${source.id}: fetch hit the page cap — skipping missing-task reconciliation`);
+    }
+
     source.lastSyncedAt = new Date();
     await this.uow.withTx(async (em) => {
       await em.query(`UPDATE task_sources SET last_synced_at = now() WHERE id = $1`, [source.id]);
@@ -66,11 +80,11 @@ export class TaskSyncService {
           aggregateType: 'task_source',
           aggregateId: source.id,
           eventType: EventTypes.TaskSynced,
-          payload: { projectId: project.id, upserted },
+          payload: { projectId: project.id, upserted, closed },
         },
       ]);
     });
-    this.logger.log(`synced ${upserted} task(s) from ${source.kind} source ${source.id}`);
+    this.logger.log(`synced ${upserted} task(s), closed ${closed} from ${source.kind} source ${source.id}`);
     return { upserted };
   }
 }

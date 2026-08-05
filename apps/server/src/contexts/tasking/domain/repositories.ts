@@ -8,6 +8,10 @@ export interface TaskRepository {
   /** sourceCreatedAt: creation time at the source (GitHub issue) — the board
    *  sorts newest-first by created_at, so source order survives the sync. */
   upsertSynced(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id: string; sourceCreatedAt?: Date }): Promise<string>;
+  /** Close the loop: tasks of this source that vanished from the current
+   *  external set (issue closed, checklist item removed/checked) move
+   *  backlog/failed → done. Local in_flow/review/done are never touched. */
+  markMissingAsDone(sourceId: string, presentExternalKeys: string[]): Promise<number>;
   /** Keyset-paginated board listing (cursor = last task id). */
   listBoard(projectId: string, opts?: { status?: TaskStatus; cursor?: string; limit?: number }): Promise<Task[]>;
 }

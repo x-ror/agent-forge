@@ -84,6 +84,18 @@ export class TypeormTaskRepository implements TaskRepository {
     return rows[0]!.id;
   }
 
+  async markMissingAsDone(sourceId: string, presentExternalKeys: string[]): Promise<number> {
+    // TypeORM's query() returns [rows, affectedCount] for UPDATE statements.
+    const result: [Array<{ id: string }>, number] = await this.ds.query(
+      `UPDATE tasks SET status = 'done', updated_at = now()
+       WHERE source_id = $1 AND status IN ('backlog', 'failed')
+         AND external_key IS NOT NULL AND external_key <> ALL($2::text[])
+       RETURNING id`,
+      [sourceId, presentExternalKeys],
+    );
+    return result[1];
+  }
+
   async listBoard(projectId: string, opts: { status?: TaskStatus; cursor?: string; limit?: number } = {}): Promise<Task[]> {
     // Newest first (created_at, then uuidv7 id as tie-breaker).
     const qb = this.ds
