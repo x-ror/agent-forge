@@ -155,24 +155,26 @@ export function RunDetailPage() {
 
   return (
     <div className="af-run-page">
-      <div className="af-page__header">
+      <div className="af-page__header af-page__header--spread af-page__header--top">
         <div>
-          <div className="af-page__title-row">
-            <h3 className="af-page__header-title">Run {run.data.id.slice(-8)}</h3>
+          <h3 className="af-page__header-title">Run {run.data.id.slice(-8)}</h3>
+          <p className="af-page__header-desc af-page__header-desc--row">
             <StatusTag status={run.data.status} />
+            <span>
+              {formatDateTime(run.data.startedAt ?? run.data.createdAt)}
+              {duration && <> · {duration}</>}
+              {typeof usage.costUsd === 'number' && usage.costUsd > 0 && <> · ${usage.costUsd.toFixed(2)}</>}
+            </span>
             {run.data.branch && <code className="af-branch-chip">{run.data.branch}</code>}
-            {!terminal && (
-              <Button kind="danger--ghost" size="sm" renderIcon={StopFilled} onClick={() => runInput.mutate({ kind: 'cancel' })}>
-                Cancel run
-              </Button>
-            )}
-          </div>
-          <p className="af-page__header-desc">
-            {formatDateTime(run.data.startedAt ?? run.data.createdAt)}
-            {duration && <> · {duration}</>}
-            {typeof usage.costUsd === 'number' && usage.costUsd > 0 && <> · ${usage.costUsd.toFixed(2)}</>}
           </p>
         </div>
+        {!terminal && (
+          <div className="af-page__header-actions">
+            <Button kind="danger--ghost" size="sm" renderIcon={StopFilled} onClick={() => runInput.mutate({ kind: 'cancel' })}>
+              Cancel run
+            </Button>
+          </div>
+        )}
       </div>
 
       {run.data.error && <InlineNotification kind="error" lowContrast hideCloseButton title="Run failed" subtitle={run.data.error} />}

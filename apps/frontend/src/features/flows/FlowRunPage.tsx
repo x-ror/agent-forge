@@ -58,7 +58,21 @@ function StepBody({ step, context }: { step: FlowStepDto; context: Record<string
           </Toggletip>
         </div>
       )}
+      {typeof stepContext.error === 'string' && stepContext.error && <p className="af-step-body__error">{stepContext.error}</p>}
+      {typeof stepContext.commands === 'string' && stepContext.commands && (
+        <p className="af-step-body__cmds">
+          <code>{stepContext.commands}</code>
+          {typeof stepContext.qualityRound === 'number' && (stepContext.qualityRound > 0 ? ` — passed after ${stepContext.qualityRound} fixer round(s)` : ' — passed clean')}
+        </p>
+      )}
+      {typeof stepContext.command === 'string' && stepContext.command && typeof stepContext.error === 'string' && (
+        <p className="af-step-body__cmds">
+          failing command: <code>{stepContext.command}</code>
+        </p>
+      )}
+      {typeof stepContext.output === 'string' && stepContext.output && <pre className="af-md-raw af-step-body__output">{stepContext.output}</pre>}
       {typeof stepContext.summary === 'string' && stepContext.summary && <p>{stepContext.summary}</p>}
+      {typeof stepContext.diff_summary === 'string' && stepContext.diff_summary && <p className="af-step-body__muted">{stepContext.diff_summary}</p>}
       {typeof stepContext.url === 'string' && stepContext.url && (
         <p>
           PR: <CarbonLink href={stepContext.url}>{stepContext.url}</CarbonLink>
@@ -109,15 +123,15 @@ export function FlowRunPage() {
 
   return (
     <div>
-      <div className="af-page__header af-page__header--spread">
+      <div className="af-page__header af-page__header--spread af-page__header--top">
         <div>
-          <div className="af-page__title-row">
-            <h3 className="af-page__header-title">{taskTitle ?? `Flow ${flow.data.id.slice(-8)}`}</h3>
+          <h3 className="af-page__header-title">{taskTitle ?? `Flow ${flow.data.id.slice(-8)}`}</h3>
+          <p className="af-page__header-desc af-page__header-desc--row">
             <StatusTag status={flow.data.status} />
-          </div>
-          <p className="af-page__header-desc">
-            Flow {flow.data.id.slice(-8)} · started {formatDateTime(flow.data.startedAt)}
-            {duration && <> · took {duration}</>}
+            <span>
+              Flow {flow.data.id.slice(-8)} · {formatDateTime(flow.data.startedAt)}
+              {duration && <> · {duration}</>}
+            </span>
           </p>
         </div>
         <div className="af-page__header-actions">
@@ -170,7 +184,7 @@ export function FlowRunPage() {
         <TabPanels>
           <TabPanel>
             {/* The story of the flow: every hand-off and decision (§10.2). */}
-            <Accordion align="start">
+            <Accordion align="start" className="af-flow-timeline">
               {steps.map((step) => (
                 <AccordionItem
                   key={step.id}
