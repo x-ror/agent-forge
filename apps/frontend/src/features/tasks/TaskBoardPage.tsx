@@ -8,7 +8,6 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  TableExpandedRow,
   TableExpandHeader,
   TableExpandRow,
   TableHead,
@@ -150,30 +149,27 @@ function TaskActions({ task, onStart }: { task: TaskDto; onStart: (t: TaskDto) =
   );
 }
 
-function NestedTasksTable({ tasks, onStart }: { tasks: TaskDto[]; onStart: (t: TaskDto) => void }) {
+/**
+ * Children render as real rows of the main table — not a nested <table> —
+ * so status/source/date/actions share the parent's columns exactly.
+ */
+function ChildTaskRow({ child, onStart }: { child: TaskDto; onStart: (t: TaskDto) => void }) {
   return (
-    <div className="af-task-nested">
-      <table className="af-task-nested__table">
-        <tbody>
-          {tasks.map((child) => (
-            <tr key={child.id} className="af-task-nested__row">
-              <td className="af-task-nested__title">
-                <span className="af-task-nested__indent" aria-hidden />
-                <TaskTitleText task={child} />
-              </td>
-              <td>
-                <StatusTag status={child.status} />
-              </td>
-              <td className="af-cell--nowrap">{child.externalKey ?? 'manual'}</td>
-              <td className="af-cell--nowrap">{formatDateTime(child.updatedAt)}</td>
-              <td className="af-task-nested__actions">
-                <TaskActions task={child} onStart={onStart} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <TableRow className="af-task-row--child">
+      <TableCell className="cds--table-expand" />
+      <TableCell>
+        <span className="af-task-child-indent" aria-hidden />
+        <TaskTitleText task={child} />
+      </TableCell>
+      <TableCell>
+        <StatusTag status={child.status} />
+      </TableCell>
+      <TableCell className="af-cell--nowrap">{child.externalKey ?? 'manual'}</TableCell>
+      <TableCell className="af-cell--nowrap">{formatDateTime(child.updatedAt)}</TableCell>
+      <TableCell>
+        <TaskActions task={child} onStart={onStart} />
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -288,17 +284,13 @@ export function TaskBoardPage() {
                           <TableCell>
                             <TaskStatusCell node={node} />
                           </TableCell>
-                          <TableCell>{task.externalKey ?? 'manual'}</TableCell>
+                          <TableCell className="af-cell--nowrap">{task.externalKey ?? 'manual'}</TableCell>
                           <TableCell className="af-cell--nowrap">{formatDateTime(task.updatedAt)}</TableCell>
                           <TableCell>
                             <TaskActions task={task} onStart={setStartFor} />
                           </TableCell>
                         </TableExpandRow>
-                        {isOpen && (
-                          <TableExpandedRow colSpan={HEADERS.length + 1} className="af-task-expanded">
-                            <NestedTasksTable tasks={node.children} onStart={setStartFor} />
-                          </TableExpandedRow>
-                        )}
+                        {isOpen && node.children.map((child) => <ChildTaskRow key={child.id} child={child} onStart={setStartFor} />)}
                       </Fragment>
                     );
                   }
@@ -312,7 +304,7 @@ export function TaskBoardPage() {
                       <TableCell>
                         <TaskStatusCell node={node} />
                       </TableCell>
-                      <TableCell>{task.externalKey ?? 'manual'}</TableCell>
+                      <TableCell className="af-cell--nowrap">{task.externalKey ?? 'manual'}</TableCell>
                       <TableCell className="af-cell--nowrap">{formatDateTime(task.updatedAt)}</TableCell>
                       <TableCell>
                         <TaskActions task={task} onStart={setStartFor} />

@@ -88,51 +88,20 @@
   text-decoration: underline;
 }
 
-/* Direct child only — the nested table's own tds manage their padding below.
-   (!important: Carbon's .cds--data-table td padding also matches in here.) */
-.af-task-expanded > td {
-  padding: 0 !important;
+/* Children are real rows of the main table (perfect column alignment) —
+   only the title cell is indented, and the row sits on a raised layer. */
+.af-task-row--child td {
   background: var(--cds-layer-01);
 }
 
-.af-task-nested {
-  padding: 0 0 0.5rem 0;
-}
-
-.af-task-nested__table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.af-task-nested__row td {
-  padding: 0.5rem 1rem !important;
-  border-top: 1px solid var(--cds-border-subtle-01);
-  vertical-align: middle;
-  font-size: 0.875rem;
-}
-
-.af-task-nested__row td.af-task-nested__title {
-  /* Roughly align the nested status column with the parent table's, and
-     start child titles clearly to the right of root-row titles: the nested
-     table spans the full row, including under the parent's expand-arrow
-     column (2.5rem), so pad well past it. */
-  width: 45%;
-  padding-left: 5rem !important;
-}
-
-.af-task-nested__indent {
+.af-task-child-indent {
   display: inline-block;
   width: 1.25rem;
-  margin-right: 0.25rem;
-  border-left: 2px solid var(--cds-border-interactive);
   height: 0.75rem;
+  margin-left: 1.5rem;
+  margin-right: 0.5rem;
+  border-left: 2px solid var(--cds-border-interactive);
   vertical-align: middle;
-}
-
-.af-task-nested__actions {
-  text-align: right;
-  white-space: nowrap;
 }
 
 .af-empty-state p {
