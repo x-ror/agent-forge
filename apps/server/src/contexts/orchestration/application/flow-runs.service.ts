@@ -94,13 +94,11 @@ export class FlowRunsService {
     return { flowRun, steps: await this.steps.listByFlowRun(flowRunId) };
   }
 
-  async list(userId: string, limit: number, cursor?: string): Promise<FlowRunListItem[]> {
+  async list(userId: string, limit: number, cursor?: string, projectId?: string): Promise<FlowRunListItem[]> {
     const owned = await this.projects.list(userId);
-    return this.flowRuns.list(
-      owned.map((p) => p.id),
-      limit,
-      cursor,
-    );
+    const ids = projectId ? owned.filter((p) => p.id === projectId).map((p) => p.id) : owned.map((p) => p.id);
+    if (ids.length === 0) return [];
+    return this.flowRuns.list(ids, limit, cursor);
   }
 
   /** gate.human resolution (§7.1): approve/reject → engine tick. */

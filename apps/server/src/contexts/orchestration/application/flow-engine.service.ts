@@ -505,8 +505,8 @@ export class FlowEngine {
       // `Closes #N` auto-closes the source issue on merge when the task came
       // from this repo's issues (externalKey `owner/repo#N`).
       body: [
-        `Automated by AgentForge for task: ${setup.taskTitle}`,
-        ...(/#(\d+)$/.exec(setup.taskExternalKey ?? '') ? [`Closes #${/#(\d+)$/.exec(setup.taskExternalKey ?? '')![1]}`] : []),
+        setup.renderedBody,
+        ...(/#(\d+)$/.exec(setup.taskExternalKey ?? '') && !/Closes #\d+/.test(setup.renderedBody) ? [`Closes #${/#(\d+)$/.exec(setup.taskExternalKey ?? '')![1]}`] : []),
       ].join('\n\n'),
     });
     await this.otx.withFlowTick(flowRunId, async (ops) => {

@@ -48,6 +48,10 @@ export const projectSettingsSchema = z
      *  local (trusted): agents inherit the host's logged-in CLIs — claude uses
      *  its stored login, GitHub pushes/PRs resolve a token from `gh`. */
     executionMode: z.enum(['sandbox', 'local']).optional(),
+    /** Extra remote the result branch is pushed to when the repo has no GitHub
+     *  origin (e.g. a GitLab upstream for a file:// clone). The open_pr step
+     *  surfaces the forge's create-merge-request link instead of a PR. */
+    pushRemote: z.string().optional(),
   })
   .loose();
 

@@ -113,8 +113,8 @@ export class FlowRunsController {
   }
 
   @Get()
-  async list(@CurrentUser() user: AuthUser, @Query('cursor') cursor?: string, @Query('limit') limit?: string): Promise<FlowRunDto[]> {
-    const flows = await this.flowRuns.list(user.userId, limit ? Number(limit) : 50, cursor);
+  async list(@CurrentUser() user: AuthUser, @Query('cursor') cursor?: string, @Query('limit') limit?: string, @Query('projectId') projectId?: string): Promise<FlowRunDto[]> {
+    const flows = await this.flowRuns.list(user.userId, limit ? Number(limit) : 50, cursor, projectId);
     return flows.map((f) => ({ ...flowToDto(f.flowRun), taskTitle: f.taskTitle, workflowName: f.workflowName, projectName: f.projectName }));
   }
 

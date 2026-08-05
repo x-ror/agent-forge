@@ -124,6 +124,7 @@ function EditProjectModal({ project, onClose }: { project: ProjectDto; onClose: 
   const [repoUrl, setRepoUrl] = useState(project.repoUrl);
   const [defaultBranch, setDefaultBranch] = useState(project.defaultBranch);
   const [executionMode, setExecutionMode] = useState<'sandbox' | 'local'>(project.settings.executionMode === 'local' ? 'local' : 'sandbox');
+  const [pushRemote, setPushRemote] = useState(project.settings.pushRemote ?? '');
   return (
     <Modal
       open
@@ -133,7 +134,10 @@ function EditProjectModal({ project, onClose }: { project: ProjectDto; onClose: 
       primaryButtonDisabled={!name || !repoUrl || !defaultBranch || updateProject.isPending}
       onRequestClose={onClose}
       onRequestSubmit={() =>
-        updateProject.mutate({ id: project.id, body: { name, repoUrl, defaultBranch, settings: { ...project.settings, executionMode } } }, { onSuccess: onClose })
+        updateProject.mutate(
+          { id: project.id, body: { name, repoUrl, defaultBranch, settings: { ...project.settings, executionMode, pushRemote: pushRemote.trim() || undefined } } },
+          { onSuccess: onClose },
+        )
       }
     >
       <Stack gap={5}>
@@ -156,6 +160,14 @@ function EditProjectModal({ project, onClose }: { project: ProjectDto; onClose: 
           <SelectItem value="sandbox" text="Sandbox — isolated, credentials from project secrets" />
           <SelectItem value="local" text="Local — trusted: host claude + gh logins" />
         </Select>
+        <TextInput
+          id="edit-project-push-remote"
+          labelText="Push remote (optional)"
+          helperText="For non-GitHub repos (e.g. a local GitLab clone): the result branch is also pushed here and the run links to the forge's create-MR page."
+          placeholder="git@gitlab.example.com:group/repo.git"
+          value={pushRemote}
+          onChange={(e) => setPushRemote(e.target.value)}
+        />
       </Stack>
     </Modal>
   );

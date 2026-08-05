@@ -8,7 +8,7 @@ import type { Project } from '../../projects/domain/project';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../projects/domain/repositories';
 import { SecretProvisioningService } from '../../projects/application/projects.service';
 import { ARTIFACT_REPOSITORY, type ArtifactRepository } from '../../execution/domain/repositories';
-import { parseGithubRepo, sanitizeBranchName, ScmError, type PullRequestResult, type WorktreeInfo } from '../domain/scm';
+import { mergeRequestNewUrl, parseGithubRepo, sanitizeBranchName, ScmError, type PullRequestResult, type WorktreeInfo } from '../domain/scm';
 import { GH_CLI_PORT, GIT_PORT, GITHUB_PORT, type GhCliPort, type GitPort, type GithubPort } from '../domain/ports';
 
 /**
@@ -243,6 +243,31 @@ export class ScmService {
         createdAt: new Date(),
       });
       return { kind: 'pr', url: pr.url, number: pr.number, artifactId: null, branch: args.branch };
+    }
+
+    const pushRemote = typeof args.project.settings.pushRemote === 'string' ? args.project.settings.pushRemote : undefined;
+    if (!githubRepo && pushRemote) {
+      // Forge upstream (e.g. GitLab over SSH) for a local clone: the branch is
+      // already in the clone; push it upstream too and surface the forge's
+      // create-MR link (GitLab prints one on push; else construct it).
+      try {
+        const { stderr } = await this.git.run(['-C', args.worktree, 'push', pushRemote, `HEAD:refs/heads/${args.branch}`]);
+        const url = /https?:\/\/\S*merge_request\S*/.exec(stderr)?.[0] ?? mergeRequestNewUrl(pushRemote, args.branch);
+        await this.artifacts.insert({
+          id: uuidv7(),
+          runId: args.runId,
+          flowRunId: args.flowRunId ?? null,
+          kind: 'pr',
+          name: `MR branch ${args.branch}`,
+          content: null,
+          path: null,
+          meta: { url, number: null, branch: args.branch },
+          createdAt: new Date(),
+        });
+        return { kind: 'pr', url, number: null, artifactId: null, branch: args.branch };
+      } catch (error) {
+        this.logger.warn(`push to ${pushRemote} failed, branch remains in the local clone only: ${String(error)}`);
+      }
     }
 
     // Pushed (e.g. to a local bare remote) but no PR provider: record the branch.

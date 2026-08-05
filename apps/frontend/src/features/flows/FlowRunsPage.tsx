@@ -1,6 +1,7 @@
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableHeader, TableRow, Tile } from '@carbon/react';
 import { Link } from 'react-router';
 import { useFlowRuns } from '../../api/hooks';
+import { useAppState } from '../../state/app-state';
 import { StatusTag } from '../../components/StatusTag';
 import { formatDateTime } from '../../components/format';
 
@@ -9,14 +10,15 @@ function FlowRunsHeader() {
     <div className="af-page__header">
       <div>
         <h3 className="af-page__header-title">Flow Runs</h3>
-        <p className="af-page__header-desc">Every workflow run across your projects, newest first</p>
+        <p className="af-page__header-desc">Every workflow run in the active project, newest first</p>
       </div>
     </div>
   );
 }
 
 export function FlowRunsPage() {
-  const flows = useFlowRuns();
+  const { projectId } = useAppState();
+  const flows = useFlowRuns(projectId);
   if (flows.data && flows.data.length === 0) {
     return (
       <div>

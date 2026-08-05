@@ -22,7 +22,13 @@ describe('adfToText', () => {
     const adf = {
       type: 'doc',
       content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'Fix the ' }, { type: 'text', text: 'crawler', marks: [{ type: 'strong' }] }] },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Fix the ' },
+            { type: 'text', text: 'crawler', marks: [{ type: 'strong' }] },
+          ],
+        },
         { type: 'paragraph', content: [{ type: 'text', text: 'line one' }, { type: 'hardBreak' }, { type: 'text', text: 'line two' }] },
         { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'retry on 429' }] }] }] },
       ],

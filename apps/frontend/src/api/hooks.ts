@@ -242,10 +242,10 @@ export function useWorkflow(id: string | null) {
 
 // ---- flow runs -------------------------------------------------------------
 
-export function useFlowRuns() {
+export function useFlowRuns(projectId?: string | null) {
   return useQuery({
-    queryKey: ['flow-runs'],
-    queryFn: () => api.get<FlowRunDto[]>('/flow-runs'),
+    queryKey: ['flow-runs', projectId ?? 'all'],
+    queryFn: () => api.get<FlowRunDto[]>(projectId ? `/flow-runs?projectId=${encodeURIComponent(projectId)}` : '/flow-runs'),
     refetchInterval: 5000,
   });
 }

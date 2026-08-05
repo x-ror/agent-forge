@@ -38,6 +38,21 @@ export function parseGithubRepo(repoUrl: string): GithubRepo | null {
   return null;
 }
 
+/** Web URL for a git remote: git@gitlab.co.com:grp/app.git → https://gitlab.co.com/grp/app */
+export function remoteWebUrl(remote: string): string | null {
+  const ssh = /^(?:ssh:\/\/)?git@([^:/]+)[:/](.+?)(?:\.git)?\/?$/.exec(remote);
+  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
+  const https = /^https:\/\/([^/]+)\/(.+?)(?:\.git)?\/?$/.exec(remote);
+  if (https) return `https://${https[1]}/${https[2]}`;
+  return null;
+}
+
+/** GitLab's create-MR page for a branch — the fallback when the push output has no link. */
+export function mergeRequestNewUrl(remote: string, branch: string): string | null {
+  const web = remoteWebUrl(remote);
+  return web ? `${web}/-/merge_requests/new?merge_request%5Bsource_branch%5D=${encodeURIComponent(branch)}` : null;
+}
+
 export function sanitizeBranchName(name: string): string {
   return (
     name
