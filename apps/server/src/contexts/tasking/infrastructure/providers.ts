@@ -66,7 +66,7 @@ export function parseFileTasksMarkdown(content: string, filePath: string): Exter
         tasks.push(epic);
         epicEmitted = true;
       }
-      meta.parentExternalKey = epic.externalKey;
+      meta.parentExternalKeys = [epic.externalKey];
     }
     tasks.push({
       externalKey: `file:${filePath}:${slugKey(title)}`,
@@ -88,14 +88,20 @@ function bodyTaskRefs(body: string): Array<{ number: number; checked: boolean }>
   return refs;
 }
 
+/** Append an epic membership to a task's meta.parentExternalKeys (set semantics). */
+function addMembership(task: ExternalTask, epicKey: string): void {
+  const keys = Array.isArray(task.meta.parentExternalKeys) ? (task.meta.parentExternalKeys as Json[]) : [];
+  if (!keys.includes(epicKey)) keys.push(epicKey);
+  task.meta.parentExternalKeys = keys;
+}
+
 /**
  * Labeled-epic fallback: repos that don't use GitHub's native sub-issues often
- * keep a task-list of issue refs in the epic body. Derive child links
- * (meta.parentExternalKey) and progress (meta.subIssues from the checkboxes —
- * checked refs count as done even though closed issues are never synced).
- * Native sub-issue data wins when present; an epic is never linked as another
- * epic's child (the board tree is one level, so it would orphan its own
- * children); the first epic to reference an issue keeps it.
+ * keep a task-list of issue refs in the epic body. Membership is a set — a
+ * task referenced by several epics belongs to all of them (epics are filters
+ * on the board, not exclusive containers). Progress (meta.subIssues) comes
+ * from the checkboxes — checked refs count as done even though closed issues
+ * are never synced; native sub-issue progress wins when present.
  */
 export function linkEpicsByBodyTaskLists(tasks: ExternalTask[]): void {
   const byNumber = new Map<number, ExternalTask>();
@@ -104,15 +110,16 @@ export function linkEpicsByBodyTaskLists(tasks: ExternalTask[]): void {
   }
   for (const epic of tasks) {
     if (epic.meta.role !== 'epic') continue;
-    const native = epic.meta.subIssues as { total?: number } | undefined;
-    if ((native?.total ?? 0) > 0) continue;
     const refs = bodyTaskRefs(epic.body);
     if (refs.length === 0) continue;
-    epic.meta.subIssues = { total: refs.length, completed: refs.filter((r) => r.checked).length };
+    const native = epic.meta.subIssues as { total?: number } | undefined;
+    if ((native?.total ?? 0) === 0) {
+      epic.meta.subIssues = { total: refs.length, completed: refs.filter((r) => r.checked).length };
+    }
     for (const ref of refs) {
       const child = byNumber.get(ref.number);
-      if (!child || child === epic || child.meta.role === 'epic') continue;
-      if (child.meta.parentExternalKey === undefined) child.meta.parentExternalKey = epic.externalKey;
+      if (!child || child === epic) continue;
+      addMembership(child, epic.externalKey);
     }
   }
 }
@@ -167,7 +174,7 @@ export class GithubIssuesProvider implements TaskSourceProvider {
           number: issue.number,
           labels,
         };
-        if (parentExternalKey) meta.parentExternalKey = parentExternalKey;
+        if (parentExternalKey) meta.parentExternalKeys = [parentExternalKey];
         if (labeledEpic || hasSubIssues) meta.role = 'epic';
         if (issue.sub_issues_summary) {
           meta.subIssues = {
