@@ -21,8 +21,11 @@ export function WorkflowsPage() {
   return (
     <div>
       <div className="af-page__header af-page__header--spread">
-        <h3>Workflows</h3>
-        <Button renderIcon={Add} onClick={() => navigate('/workflows/new')}>
+        <div>
+          <h3 className="af-page__header-title">Workflows</h3>
+          <p className="af-page__header-desc">Versioned agent pipelines for this project — built on the canvas</p>
+        </div>
+        <Button size="sm" renderIcon={Add} onClick={() => navigate('/workflows/new')}>
           New workflow
         </Button>
       </div>

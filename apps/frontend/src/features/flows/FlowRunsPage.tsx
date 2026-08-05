@@ -4,12 +4,23 @@ import { useFlowRuns } from '../../api/hooks';
 import { StatusTag } from '../../components/StatusTag';
 import { formatDateTime } from '../../components/format';
 
+function FlowRunsHeader() {
+  return (
+    <div className="af-page__header">
+      <div>
+        <h3 className="af-page__header-title">Flow Runs</h3>
+        <p className="af-page__header-desc">Every workflow run across your projects, newest first</p>
+      </div>
+    </div>
+  );
+}
+
 export function FlowRunsPage() {
   const flows = useFlowRuns();
   if (flows.data && flows.data.length === 0) {
     return (
       <div>
-        <h3>Flow Runs</h3>
+        <FlowRunsHeader />
         <Tile className="af-empty-state">
           <h4>No flow runs yet</h4>
           <p>Start a workflow from the Task Board — every run shows up here with its full timeline.</p>
@@ -19,7 +30,7 @@ export function FlowRunsPage() {
   }
   return (
     <div>
-      <h3>Flow Runs</h3>
+      <FlowRunsHeader />
       <StructuredListWrapper>
         <StructuredListHead>
           <StructuredListRow head>
