@@ -14,114 +14,24 @@ function slugKey(title: string): string {
     .slice(0, 80);
 }
 
-/** Parse parent issue number from a GitHub API parent_issue_url. */
-export function parentNumberFromUrl(url: string | null | undefined): number | null {
-  if (!url) return null;
-  const match = /\/issues\/(\d+)(?:\?|$)/.exec(url);
-  return match ? Number(match[1]) : null;
-}
-
 /**
- * Tracked-file markdown → external tasks.
- *
- * - Unchecked checklist items (`- [ ] Title`) become tasks.
- * - One grouping rule: a heading whose title starts with `Epic:` (any `#`
- *   level) collects the checklist items below it under an epic parent
- *   (`meta.role = 'epic'`, children get `meta.parentExternalKey`). Every
- *   other heading simply ends the current group — plain sections like
- *   `## Notes` never become epics by accident.
- * - An epic with no unchecked items is not emitted (no dangling epic rows).
+ * Tracked-file markdown → external tasks: every unchecked checklist item
+ * (`- [ ] Title`) becomes a task; headings and prose are ignored.
  */
 export function parseFileTasksMarkdown(content: string, filePath: string): ExternalTask[] {
   const tasks: ExternalTask[] = [];
-  let epic: ExternalTask | null = null;
-  let epicEmitted = false;
-
   for (const raw of content.split('\n')) {
-    const line = raw.trim();
-    const heading = /^#{1,3}\s+(.+)$/.exec(line);
-    if (heading) {
-      const epicTitle = /^epic\s*[:\-–—]\s*(.+)$/i.exec(heading[1]!.trim());
-      if (epicTitle) {
-        const title = epicTitle[1]!.trim();
-        epic = {
-          externalKey: `file:${filePath}:epic:${slugKey(title) || 'epic'}`,
-          title,
-          body: '',
-          meta: { file: filePath, role: 'epic' } as { [key: string]: Json },
-        };
-        epicEmitted = false;
-      } else {
-        epic = null;
-      }
-      continue;
-    }
-
-    const match = /^[-*]\s*\[ \]\s+(.+)$/.exec(line);
+    const match = /^[-*]\s*\[ \]\s+(.+)$/.exec(raw.trim());
     if (!match) continue;
     const title = match[1]!.trim();
-    const meta: { [key: string]: Json } = { file: filePath };
-    if (epic) {
-      if (!epicEmitted) {
-        tasks.push(epic);
-        epicEmitted = true;
-      }
-      meta.parentExternalKeys = [epic.externalKey];
-    }
     tasks.push({
       externalKey: `file:${filePath}:${slugKey(title)}`,
       title,
       body: '',
-      meta,
+      meta: { file: filePath },
     });
   }
   return tasks;
-}
-
-/** GitHub task-list references in an issue body: `- [ ] #80 …` / `- [x] #80 …`. */
-function bodyTaskRefs(body: string): Array<{ number: number; checked: boolean }> {
-  const refs: Array<{ number: number; checked: boolean }> = [];
-  for (const raw of body.split('\n')) {
-    const match = /^\s*[-*]\s*\[([ xX])\]\s*[^#\n]*#(\d+)/.exec(raw);
-    if (match) refs.push({ number: Number(match[2]), checked: match[1] !== ' ' });
-  }
-  return refs;
-}
-
-/** Append an epic membership to a task's meta.parentExternalKeys (set semantics). */
-function addMembership(task: ExternalTask, epicKey: string): void {
-  const keys = Array.isArray(task.meta.parentExternalKeys) ? (task.meta.parentExternalKeys as Json[]) : [];
-  if (!keys.includes(epicKey)) keys.push(epicKey);
-  task.meta.parentExternalKeys = keys;
-}
-
-/**
- * Labeled-epic fallback: repos that don't use GitHub's native sub-issues often
- * keep a task-list of issue refs in the epic body. Membership is a set — a
- * task referenced by several epics belongs to all of them (epics are filters
- * on the board, not exclusive containers). Progress (meta.subIssues) comes
- * from the checkboxes — checked refs count as done even though closed issues
- * are never synced; native sub-issue progress wins when present.
- */
-export function linkEpicsByBodyTaskLists(tasks: ExternalTask[]): void {
-  const byNumber = new Map<number, ExternalTask>();
-  for (const t of tasks) {
-    if (typeof t.meta.number === 'number') byNumber.set(t.meta.number, t);
-  }
-  for (const epic of tasks) {
-    if (epic.meta.role !== 'epic') continue;
-    const refs = bodyTaskRefs(epic.body);
-    if (refs.length === 0) continue;
-    const native = epic.meta.subIssues as { total?: number } | undefined;
-    if ((native?.total ?? 0) === 0) {
-      epic.meta.subIssues = { total: refs.length, completed: refs.filter((r) => r.checked).length };
-    }
-    for (const ref of refs) {
-      const child = byNumber.get(ref.number);
-      if (!child || child === epic) continue;
-      addMembership(child, epic.externalKey);
-    }
-  }
 }
 
 /** GitHub Issues → tasks. Config: { repo?: 'owner/name', labels?: string[] }. */
@@ -157,47 +67,26 @@ export class GithubIssuesProvider implements TaskSourceProvider {
       html_url: string;
       labels: Array<{ name: string }>;
       pull_request?: unknown;
-      parent_issue_url?: string | null;
-      sub_issues_summary?: { total?: number; completed?: number; percent_completed?: number } | null;
     }>;
 
-    const externalTasks = issues
+    return issues
       .filter((issue) => !issue.pull_request) // the issues API also returns PRs
-      .map((issue) => {
-        const labels = issue.labels.map((l) => l.name);
-        const parentNum = parentNumberFromUrl(issue.parent_issue_url);
-        const parentExternalKey = parentNum != null ? `${parsed.owner}/${parsed.repo}#${parentNum}` : null;
-        const hasSubIssues = (issue.sub_issues_summary?.total ?? 0) > 0;
-        const labeledEpic = labels.some((l) => /^epic$/i.test(l));
-        const meta: { [key: string]: Json } = {
+      .map((issue) => ({
+        externalKey: `${parsed.owner}/${parsed.repo}#${issue.number}`,
+        title: issue.title,
+        body: issue.body ?? '',
+        meta: {
           url: issue.html_url,
           number: issue.number,
-          labels,
-        };
-        if (parentExternalKey) meta.parentExternalKeys = [parentExternalKey];
-        if (labeledEpic || hasSubIssues) meta.role = 'epic';
-        if (issue.sub_issues_summary) {
-          meta.subIssues = {
-            total: issue.sub_issues_summary.total ?? 0,
-            completed: issue.sub_issues_summary.completed ?? 0,
-          };
-        }
-        return {
-          externalKey: `${parsed.owner}/${parsed.repo}#${issue.number}`,
-          title: issue.title,
-          body: issue.body ?? '',
-          meta,
-        };
-      });
-    linkEpicsByBodyTaskLists(externalTasks);
-    return externalTasks;
+          labels: issue.labels.map((l) => l.name),
+        } as { [key: string]: Json },
+      }));
   }
 }
 
 /**
  * Tracked-file source: a markdown checklist in the repo. Config: { path }.
- * Lines like `- [ ] Title` become tasks (unchecked only). `Epic:` headings
- * group subsequent items under an epic parent (see parseFileTasksMarkdown).
+ * Lines like `- [ ] Title` become tasks (unchecked only).
  */
 @Injectable()
 export class FileTasksProvider implements TaskSourceProvider {

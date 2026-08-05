@@ -13,14 +13,13 @@ import {
   TableRow,
   TableToolbar,
   TableToolbarContent,
-  Tag,
   TextArea,
   TextInput,
   Tile,
 } from '@carbon/react';
 import { Add, Play, Renew } from '@carbon/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { TaskDto } from '@agentforge/core';
 import { useCreateTask, useStartFlow, useSyncTaskSource, useTaskBoard, useTaskSources, useWorkflows } from '../../api/hooks';
@@ -28,7 +27,12 @@ import { useSse } from '../../api/sse';
 import { useAppState } from '../../state/app-state';
 import { StatusTag } from '../../components/StatusTag';
 import { formatDateTime } from '../../components/format';
-import { buildEpicFilters, leafTasks, taskUrl, type EpicFilter } from './task-epics';
+
+/** Source web page for the task (GitHub issue html_url); null for file/manual tasks. */
+function taskUrl(task: TaskDto): string | null {
+  const v = task.meta?.url;
+  return typeof v === 'string' && /^https?:\/\//.test(v) ? v : null;
+}
 
 const HEADERS = [
   { key: 'title', header: 'Task' },
@@ -122,50 +126,6 @@ function TaskActions({ task, onStart }: { task: TaskDto; onStart: (t: TaskDto) =
   );
 }
 
-/** Epic filter chips: `title · done/total` — click to filter, click again to clear. */
-function EpicChips({ filters, selected, onSelect }: { filters: EpicFilter[]; selected: string | null; onSelect: (key: string | null) => void }) {
-  if (filters.length === 0) return null;
-  return (
-    <div className="af-epic-chips" role="group" aria-label="Filter by epic">
-      <Button size="sm" kind={selected === null ? 'primary' : 'tertiary'} onClick={() => onSelect(null)}>
-        All tasks
-      </Button>
-      {filters.map((f) => {
-        const key = f.task.externalKey!;
-        return (
-          <Button key={key} size="sm" kind={selected === key ? 'primary' : 'tertiary'} className="af-epic-chip" onClick={() => onSelect(selected === key ? null : key)}>
-            <span className="af-epic-chip__title">{f.task.title}</span>
-            <span className="af-epic-chip__progress">
-              {f.done}/{f.total}
-            </span>
-          </Button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Context line for the active epic: progress, board membership, source link. */
-function EpicContext({ filter }: { filter: EpicFilter }) {
-  const url = taskUrl(filter.task);
-  return (
-    <p className="af-epic-context">
-      <Tag type="purple" size="sm">
-        epic
-      </Tag>
-      <strong>{filter.task.title}</strong> — {filter.done}/{filter.total} done, {filter.memberCount} open on this board
-      {url && (
-        <>
-          {' · '}
-          <a href={url} target="_blank" rel="noreferrer">
-            open source issue
-          </a>
-        </>
-      )}
-    </p>
-  );
-}
-
 export function TaskBoardPage() {
   const { projectId } = useAppState();
   const board = useTaskBoard(projectId);
@@ -174,7 +134,6 @@ export function TaskBoardPage() {
   const qc = useQueryClient();
   const [startFor, setStartFor] = useState<TaskDto | null>(null);
   const [newTask, setNewTask] = useState(false);
-  const [epicKey, setEpicKey] = useState<string | null>(null);
 
   // Board wake-ups: task.synced / task.status_changed → refetch (§10.3).
   useSse(projectId ? `/api/v1/tasks/stream/${projectId}` : null, {
@@ -183,9 +142,6 @@ export function TaskBoardPage() {
   });
 
   const tasks = board.data?.tasks ?? [];
-  const epicFilters = useMemo(() => buildEpicFilters(tasks), [tasks]);
-  const leaves = useMemo(() => leafTasks(tasks, epicKey), [tasks, epicKey]);
-  const activeEpic = epicKey ? epicFilters.find((f) => f.task.externalKey === epicKey) : undefined;
 
   if (!projectId) {
     return (
@@ -196,20 +152,20 @@ export function TaskBoardPage() {
     );
   }
 
-  const rows = leaves.map((task) => ({
+  const rows = tasks.map((task) => ({
     id: task.id,
     title: task.title,
     status: task.status,
     externalKey: task.externalKey ?? 'manual',
     updatedAt: formatDateTime(task.updatedAt),
   }));
-  const taskById = new Map(leaves.map((t) => [t.id, t]));
+  const taskById = new Map(tasks.map((t) => [t.id, t]));
 
   return (
     <>
       <DataTable rows={rows} headers={HEADERS}>
         {({ rows: renderRows, headers, getHeaderProps, getRowProps, getTableProps }) => (
-          <TableContainer title="Task Board" description="Synced and manual tasks for this project — pick an epic chip to focus its work">
+          <TableContainer title="Task Board" description="Synced and manual tasks for this project">
             <TableToolbar>
               <TableToolbarContent>
                 {(sources.data ?? []).map((source) => (
@@ -222,8 +178,6 @@ export function TaskBoardPage() {
                 </Button>
               </TableToolbarContent>
             </TableToolbar>
-            <EpicChips filters={epicFilters} selected={epicKey} onSelect={setEpicKey} />
-            {activeEpic && <EpicContext filter={activeEpic} />}
             <Table {...getTableProps()}>
               <TableHead>
                 <TableRow>
@@ -258,20 +212,8 @@ export function TaskBoardPage() {
             </Table>
             {renderRows.length === 0 && (
               <Tile className="af-empty-state">
-                {activeEpic ? (
-                  <>
-                    <h4>No open tasks in this epic</h4>
-                    <p>Everything referenced by this epic is either done or not synced (closed issues are not fetched).</p>
-                  </>
-                ) : (
-                  <>
-                    <h4>No tasks yet</h4>
-                    <p>
-                      Sync a task source or add a manual task to fill the board. Start a heading with <code>Epic:</code> in TASKS.md (or use GitHub sub-issues / epic labels) to
-                      group work into epic filters.
-                    </p>
-                  </>
-                )}
+                <h4>No tasks yet</h4>
+                <p>Sync a task source or add a manual task to fill the board.</p>
               </Tile>
             )}
           </TableContainer>
