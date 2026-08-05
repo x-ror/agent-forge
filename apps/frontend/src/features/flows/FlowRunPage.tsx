@@ -78,7 +78,14 @@ function StepBody({ step, context }: { step: FlowStepDto; context: Record<string
           PR: <CarbonLink href={stepContext.url}>{stepContext.url}</CarbonLink>
         </p>
       )}
-      {typeof stepContext.branch === 'string' && !stepContext.url && stepContext.branch && <p data-testid="pr-branch">pushed branch: {stepContext.branch}</p>}
+      {typeof stepContext.branch === 'string' && !stepContext.url && stepContext.branch && stepContext.kind !== 'patch' && (
+        <p data-testid="pr-branch">pushed branch: {stepContext.branch}</p>
+      )}
+      {stepContext.kind === 'patch' && (
+        <p className="af-step-body__error" data-testid="pr-branch">
+          push failed (check GITHUB_TOKEN write permissions) — saved a patch artifact for branch {String(stepContext.branch ?? '')} instead
+        </p>
+      )}
       {step.runId && (
         <p>
           <CarbonLink as={Link} to={`/runs/${step.runId}`}>
