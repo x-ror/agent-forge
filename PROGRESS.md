@@ -305,3 +305,14 @@ Ten phases, each deployed and committed separately:
 8. **Notifications** — tab-title badge + browser notifications on awaiting_input/failed transitions.
 9. **Scheduled syncs** — worker scheduler honors sync_cron as intervals (N-min/hourly/daily).
 10. **Local LLMs** — README recipe for Ollama/LM Studio via api-loop's OpenAI-compatible provider; worker gets host-gateway alias.
+
+---
+
+## Post-ship — host-mode worker, execution modes, LLM-authored PR bodies (done)
+
+- **Worker moved to the host** (systemd `agentforge-worker`, loopback-only PG/Redis ports, `/data/*` bind mounts shared with api at identical paths; container worker parked behind a compose profile). Quality gates and agents now see the real toolchain: odin, vp/vite-plus, bun, make, claude, gh.
+- **Per-project execution mode**: `sandbox` (isolated HOME, secrets only) vs `local` (trusted — claude-code uses the host CLI login; push/PR token resolves from `gh auth token` when no GITHUB_TOKEN secret). Lava runs local; the 403 read-only-token push failure class is gone.
+- **PR body is a workflow template** (`action.open_pr.body`, rendered with flow context; `Closes #N` auto-appended). Canvas gets the field.
+- **LLM-authored PR descriptions as pure configuration**: read-only `PrAuthor` agent reads `.github/pull_request_template.md` in the worktree, fills it honestly from the diff + step summaries; workflow v5 runs it before the human gate and the PR node takes `{{steps.prbody.summary}}`. No engine changes — the pattern generalizes (release notes, changelogs).
+- Lava workflow evolution this wave: v2 real gate commands → v3 always-run PrGate step → v4 templated body → v5 PrAuthor-written body.
+- Ops notes: worker redeploy = rebuild dist + `kill $(pgrep -f dist/main.worker.js)` (systemd respawns); phantom 48px global scroll was Carbon's content margin collapsing onto html — clearance is padding now.
