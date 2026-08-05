@@ -38,7 +38,7 @@ services:
       DATABASE_ADMIN_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/agentforge
       REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379
       AGENTFORGE_SECRET_KEY: ${AGENTFORGE_SECRET_KEY:?set AGENTFORGE_SECRET_KEY in .env (32-byte base64)}
-      AGENTFORGE_BASE_URL: http://localhost:3000
+      AGENTFORGE_BASE_URL: http://localhost:4400
       WORKSPACES_DIR: /data/workspaces
       ARTIFACTS_DIR: /data/artifacts
     volumes:
@@ -62,7 +62,7 @@ services:
       dockerfile: apps/frontend/Dockerfile
     image: agentforge/frontend:latest
     ports:
-      - '3000:3000' # the single public origin
+      - '4400:3000' # the single public origin (3000 clashes with day-job dev servers)
     environment:
       API_ORIGIN: http://api:3001
     depends_on:

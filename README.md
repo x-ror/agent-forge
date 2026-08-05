@@ -18,7 +18,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open **http://localhost:3000** — the first-boot wizard walks you through:
+Open **http://localhost:4400** — the first-boot wizard walks you through:
 
 1. **Account** — the first local user.
 2. **Project** — point at a repository (`https://github.com/you/repo.git`, ssh, or a local `file:///path/repo.git`).

@@ -3,11 +3,11 @@ import type { Json } from '@agentforge/core';
 export const TASK_STATUSES = ['backlog', 'in_flow', 'done', 'failed', 'archived'] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-/** §3.1: backlog → in_flow → done | failed → archived (+ failed → backlog | in_flow resume). */
+/** §3.1: backlog → in_flow → done | failed → archived (+ failed → backlog | in_flow resume; done → backlog reopen). */
 const TRANSITIONS: Record<TaskStatus, readonly TaskStatus[]> = {
   backlog: ['in_flow', 'archived'],
   in_flow: ['done', 'failed', 'backlog'],
-  done: ['archived'],
+  done: ['archived', 'backlog'], // reopen: re-run a task with a newer workflow, or the source issue reopened
   failed: ['archived', 'backlog', 'in_flow'], // in_flow = resume same flow after failure
   archived: [],
 };
