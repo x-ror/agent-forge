@@ -47,11 +47,8 @@ function ProjectPicker() {
 }
 
 export default function App() {
-  const { theme, toggleTheme } = useAppState();
+  const { theme } = useAppState();
   const me = useMe();
-  const logout = useLogout();
-  const navigate = useNavigate();
-  const location = useLocation();
   const qc = useQueryClient();
   const bootstrap = useQuery({
     queryKey: ['bootstrap'],
