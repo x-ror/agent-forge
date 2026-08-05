@@ -16,40 +16,93 @@ describe('parseFileTasksMarkdown', () => {
   });
 });
 
+describe('adfToText', () => {
+  it('flattens paragraphs, marks, lists and hard breaks into readable text', async () => {
+    const { adfToText } = await import('./providers');
+    const adf = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Fix the ' }, { type: 'text', text: 'crawler', marks: [{ type: 'strong' }] }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'line one' }, { type: 'hardBreak' }, { type: 'text', text: 'line two' }] },
+        { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'retry on 429' }] }] }] },
+      ],
+    };
+    expect(adfToText(adf)).toBe('Fix the crawler\nline one\nline two\nretry on 429');
+    expect(adfToText(undefined)).toBe('');
+    expect(adfToText('nope')).toBe('');
+  });
+});
+
 describe('JiraProvider', () => {
-  it('paginates the search, maps issues, and reports completeness', async () => {
+  it('uses Cloud v3 token pagination, maps issues, extracts ADF bodies', async () => {
     const { JiraProvider } = await import('./providers');
     const calls: string[] = [];
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
       calls.push(String(url));
       expect(((init ?? {}).headers as Record<string, string>).authorization).toBe(`Basic ${Buffer.from('me@co.test:tok').toString('base64')}`);
-      const startAt = Number(new URL(String(url)).searchParams.get('startAt'));
-      const issues =
-        startAt === 0
-          ? [
-              { key: 'WRK-2', fields: { summary: 'Second', description: 'wiki text', labels: ['backend'], created: '2026-08-01T10:00:00.000+0000' } },
-              { key: 'WRK-1', fields: { summary: 'First', description: { adf: true }, labels: [] } },
-            ]
-          : [{ key: 'WRK-3', fields: { summary: 'Third' } }];
-      return new Response(JSON.stringify({ total: 3, issues }), { status: 200 });
+      expect(String(url)).toContain('/rest/api/3/search/jql?');
+      const token = new URL(String(url)).searchParams.get('nextPageToken');
+      const body =
+        token === null
+          ? {
+              nextPageToken: 'page-2',
+              issues: [
+                { key: 'PC-2', fields: { summary: 'Second', description: 'plain text', labels: ['backend'], created: '2026-08-01T10:00:00.000+0000' } },
+                {
+                  key: 'PC-1',
+                  fields: { summary: 'First', description: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'adf body' }] }] }, labels: [] },
+                },
+              ],
+            }
+          : { issues: [{ key: 'PC-3', fields: { summary: 'Third' } }] };
+      return new Response(JSON.stringify(body), { status: 200 });
     }) as typeof fetch;
 
     try {
       const provider = new JiraProvider();
-      const result = await provider.fetch({ config: { project: 'WRK' } } as never, {
+      const result = await provider.fetch({ config: { project: 'PC' } } as never, {
         env: { JIRA_BASE_URL: 'https://co.atlassian.net/', JIRA_API_TOKEN: 'tok', JIRA_EMAIL: 'me@co.test' },
         projectRepoUrl: 'https://gitlab.com/co/app',
         projectSettings: {},
         projectId: 'p',
       });
       expect(result.complete).toBe(true);
-      expect(result.tasks.map((t) => t.externalKey)).toEqual(['WRK-2', 'WRK-1', 'WRK-3']);
-      expect(result.tasks[0]).toMatchObject({ title: 'Second', body: 'wiki text', createdAt: '2026-08-01T10:00:00.000+0000' });
-      expect(result.tasks[0]!.meta.url).toBe('https://co.atlassian.net/browse/WRK-2');
-      expect(result.tasks[1]!.body).toBe(''); // ADF object -> empty, never [object Object]
+      expect(result.tasks.map((t) => t.externalKey)).toEqual(['PC-2', 'PC-1', 'PC-3']);
+      expect(result.tasks[0]).toMatchObject({ title: 'Second', body: 'plain text', createdAt: '2026-08-01T10:00:00.000+0000' });
+      expect(result.tasks[0]!.meta.url).toBe('https://co.atlassian.net/browse/PC-2');
+      expect(result.tasks[1]!.body).toBe('adf body'); // ADF object -> extracted text, never [object Object]
       expect(calls).toHaveLength(2);
-      expect(calls[0]).toContain('project+%3D+WRK');
+      expect(calls[0]).toContain('project+%3D+PC');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('falls back to the v2 search when the instance has no api/3 (Server/DC)', async () => {
+    const { JiraProvider } = await import('./providers');
+    const calls: string[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+      calls.push(String(url));
+      expect(((init ?? {}).headers as Record<string, string>).authorization).toBe('Bearer pat');
+      if (String(url).includes('/rest/api/3/')) return new Response('not found', { status: 404 });
+      return new Response(JSON.stringify({ total: 1, issues: [{ key: 'SRV-1', fields: { summary: 'Only', description: 'wiki text' } }] }), { status: 200 });
+    }) as typeof fetch;
+
+    try {
+      const provider = new JiraProvider();
+      const result = await provider.fetch({ config: { jql: 'assignee = currentUser()' } } as never, {
+        env: { JIRA_BASE_URL: 'https://jira.co.test', JIRA_API_TOKEN: 'pat' },
+        projectRepoUrl: '',
+        projectSettings: {},
+        projectId: 'p',
+      });
+      expect(result.complete).toBe(true);
+      expect(result.tasks).toHaveLength(1);
+      expect(result.tasks[0]).toMatchObject({ externalKey: 'SRV-1', body: 'wiki text' });
+      expect(calls[0]).toContain('/rest/api/3/search/jql?');
+      expect(calls[1]).toContain('/rest/api/2/search?');
     } finally {
       globalThis.fetch = originalFetch;
     }

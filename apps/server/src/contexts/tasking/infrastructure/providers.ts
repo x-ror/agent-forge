@@ -120,11 +120,37 @@ export class FileTasksProvider implements TaskSourceProvider {
   }
 }
 
+interface JiraIssue {
+  key: string;
+  fields: { summary: string; description?: unknown; labels?: string[]; created?: string };
+}
+
+/**
+ * Plain text out of an Atlassian Document Format tree (Cloud API v3
+ * descriptions). Inline runs concatenate; block nodes stack with newlines.
+ */
+export function adfToText(node: unknown): string {
+  if (!node || typeof node !== 'object') return '';
+  const n = node as { type?: string; text?: string; attrs?: { text?: string; url?: string; shortName?: string }; content?: unknown[] };
+  if (n.type === 'hardBreak') return '\n';
+  if (typeof n.text === 'string') return n.text;
+  if (n.type === 'mention' || n.type === 'status') return n.attrs?.text ?? '';
+  if (n.type === 'emoji') return n.attrs?.shortName ?? '';
+  if (n.type === 'inlineCard') return n.attrs?.url ?? '';
+  const parts = (n.content ?? []).map(adfToText);
+  const inlineContainer = ['paragraph', 'heading', 'codeBlock', 'tableCell', 'tableHeader'].includes(n.type ?? '');
+  return inlineContainer ? parts.join('') : parts.filter((s) => s.trim() !== '').join('\n');
+}
+
 /**
  * Jira → tasks. Works against Jira Cloud (Basic auth: JIRA_EMAIL +
  * JIRA_API_TOKEN secrets) and self-hosted Server/DC (Bearer PAT: just
  * JIRA_API_TOKEN). Config: { jql?: string; project?: string } — jql wins;
  * project scopes the default "my open issues" query.
+ *
+ * Cloud removed /rest/api/2/search (410, CHANGE-2046) in favour of the
+ * token-paginated /rest/api/3/search/jql; Server/DC never got an api/3.
+ * So: try v3 first, fall back to v2 when the endpoint does not exist.
  */
 @Injectable()
 export class JiraProvider implements TaskSourceProvider {
@@ -145,6 +171,51 @@ export class JiraProvider implements TaskSourceProvider {
         ? `project = ${config.project} AND statusCategory != Done ORDER BY created DESC`
         : 'assignee = currentUser() AND statusCategory != Done ORDER BY created DESC');
 
+    return (await this.searchCloudV3(base, authorization, jql)) ?? this.searchServerV2(base, authorization, jql);
+  }
+
+  private mapIssue(base: string, issue: JiraIssue): ExternalTask {
+    const description = issue.fields.description;
+    return {
+      externalKey: issue.key,
+      title: issue.fields.summary,
+      // v2 returns wiki/plain text; Cloud v3 returns ADF objects.
+      body: typeof description === 'string' ? description : adfToText(description),
+      ...(issue.fields.created ? { createdAt: issue.fields.created } : {}),
+      meta: {
+        url: `${base}/browse/${issue.key}`,
+        labels: issue.fields.labels ?? [],
+      } as { [key: string]: Json },
+    };
+  }
+
+  /** Returns null when the instance has no api/3 (self-hosted Server/DC). */
+  private async searchCloudV3(base: string, authorization: string, jql: string): Promise<TaskSourceFetch | null> {
+    const tasks: ExternalTask[] = [];
+    let nextPageToken: string | undefined;
+    let complete = false;
+    for (let page = 0; page < 10; page += 1) {
+      const params = new URLSearchParams({ jql, maxResults: '100', fields: 'summary,description,labels,created' });
+      if (nextPageToken) params.set('nextPageToken', nextPageToken);
+      const res = await fetch(`${base}/rest/api/3/search/jql?${params.toString()}`, {
+        headers: { accept: 'application/json', authorization },
+      });
+      if (res.status === 404 && page === 0) return null;
+      if (!res.ok) {
+        throw new Error(`jira search failed: ${res.status} ${(await res.text()).slice(0, 300)}`);
+      }
+      const data = (await res.json()) as { issues?: JiraIssue[]; nextPageToken?: string };
+      for (const issue of data.issues ?? []) tasks.push(this.mapIssue(base, issue));
+      if (!data.nextPageToken || (data.issues ?? []).length === 0) {
+        complete = true;
+        break;
+      }
+      nextPageToken = data.nextPageToken;
+    }
+    return { tasks, complete };
+  }
+
+  private async searchServerV2(base: string, authorization: string, jql: string): Promise<TaskSourceFetch> {
     const tasks: ExternalTask[] = [];
     const maxResults = 100;
     let startAt = 0;
@@ -157,23 +228,8 @@ export class JiraProvider implements TaskSourceProvider {
       if (!res.ok) {
         throw new Error(`jira search failed: ${res.status} ${(await res.text()).slice(0, 300)}`);
       }
-      const data = (await res.json()) as {
-        total: number;
-        issues: Array<{ key: string; fields: { summary: string; description?: unknown; labels?: string[]; created?: string } }>;
-      };
-      for (const issue of data.issues) {
-        tasks.push({
-          externalKey: issue.key,
-          title: issue.fields.summary,
-          // API v2 returns wiki/plain text; Cloud v3 would return ADF objects.
-          body: typeof issue.fields.description === 'string' ? issue.fields.description : '',
-          ...(issue.fields.created ? { createdAt: issue.fields.created } : {}),
-          meta: {
-            url: `${base}/browse/${issue.key}`,
-            labels: issue.fields.labels ?? [],
-          } as { [key: string]: Json },
-        });
-      }
+      const data = (await res.json()) as { total: number; issues: JiraIssue[] };
+      for (const issue of data.issues) tasks.push(this.mapIssue(base, issue));
       startAt += data.issues.length;
       if (data.issues.length === 0 || startAt >= data.total) {
         complete = true;
