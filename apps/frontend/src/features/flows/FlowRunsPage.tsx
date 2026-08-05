@@ -1,4 +1,4 @@
-import { StructuredListBody, StructuredListCell, StructuredListHead, StructuredListRow, StructuredListWrapper, Tile } from '@carbon/react';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableHeader, TableRow, Tile } from '@carbon/react';
 import { Link } from 'react-router';
 import { useFlowRuns } from '../../api/hooks';
 import { StatusTag } from '../../components/StatusTag';
@@ -31,35 +31,39 @@ export function FlowRunsPage() {
   return (
     <div>
       <FlowRunsHeader />
-      <StructuredListWrapper>
-        <StructuredListHead>
-          <StructuredListRow head>
-            <StructuredListCell head>Task</StructuredListCell>
-            <StructuredListCell head>Workflow</StructuredListCell>
-            <StructuredListCell head>Status</StructuredListCell>
-            <StructuredListCell head>Started</StructuredListCell>
-            <StructuredListCell head>Finished</StructuredListCell>
-          </StructuredListRow>
-        </StructuredListHead>
-        <StructuredListBody>
-          {(flows.data ?? []).map((flow) => (
-            <StructuredListRow key={flow.id}>
-              <StructuredListCell>
-                <Link to={`/flow-runs/${flow.id}`}>{flow.taskTitle ?? flow.id.slice(-12)}</Link>
-              </StructuredListCell>
-              <StructuredListCell className="af-cell--nowrap">
-                {flow.workflowName ?? '—'}
-                {flow.projectName ? <span className="af-settings__muted"> · {flow.projectName}</span> : null}
-              </StructuredListCell>
-              <StructuredListCell>
-                <StatusTag status={flow.status} />
-              </StructuredListCell>
-              <StructuredListCell className="af-cell--nowrap">{formatDateTime(flow.startedAt)}</StructuredListCell>
-              <StructuredListCell className="af-cell--nowrap">{flow.finishedAt ? formatDateTime(flow.finishedAt) : '—'}</StructuredListCell>
-            </StructuredListRow>
-          ))}
-        </StructuredListBody>
-      </StructuredListWrapper>
+      <TableContainer>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableHeader>Task</TableHeader>
+              <TableHeader>Workflow</TableHeader>
+              <TableHeader>Status</TableHeader>
+              <TableHeader>Started</TableHeader>
+              <TableHeader>Finished</TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {(flows.data ?? []).map((flow) => (
+              <TableRow key={flow.id}>
+                <TableCell>
+                  <Link className="af-row-link" to={`/flow-runs/${flow.id}`}>
+                    {flow.taskTitle ?? flow.id.slice(-12)}
+                  </Link>
+                </TableCell>
+                <TableCell className="af-cell--nowrap">
+                  {flow.workflowName ?? '—'}
+                  {flow.projectName ? <span className="af-settings__muted"> · {flow.projectName}</span> : null}
+                </TableCell>
+                <TableCell>
+                  <StatusTag status={flow.status} />
+                </TableCell>
+                <TableCell className="af-cell--nowrap">{formatDateTime(flow.startedAt)}</TableCell>
+                <TableCell className="af-cell--nowrap">{flow.finishedAt ? formatDateTime(flow.finishedAt) : '—'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </div>
   );
 }

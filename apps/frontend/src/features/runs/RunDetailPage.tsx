@@ -251,6 +251,7 @@ export function RunDetailPage() {
                 />
                 <Button
                   kind="secondary"
+                  size="md"
                   renderIcon={Send}
                   disabled={!message.trim()}
                   onClick={() => {

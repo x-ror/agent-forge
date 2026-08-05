@@ -354,7 +354,11 @@
 }
 
 .af-run-feed__scroll {
-  height: 55vh;
+  /* Fit the viewport instead of forcing page + feed double scrollbars:
+     grows with content, scrolls internally only past the cap.
+     22rem ≈ header + page title + tabs + steer row + paddings. */
+  max-height: calc(100vh - 22rem);
+  min-height: 14rem;
   overflow: auto;
   padding: 0.5rem 1rem;
 }
@@ -371,7 +375,7 @@
 }
 
 .af-event-row {
-  padding: 0.3rem 0.5rem;
+  padding: 0.45rem 0.75rem;
   border-bottom: 1px solid var(--cds-border-subtle);
   border-left: 2px solid transparent; /* type accent lands here */
   line-height: 1.45;
@@ -430,8 +434,17 @@
 
 .af-run-detail__steer {
   display: flex;
+  align-items: stretch;
   gap: 0.5rem;
   margin-top: 0.75rem;
+}
+
+.af-run-detail__steer .cds--text-input-wrapper {
+  flex: 1;
+}
+
+.af-run-detail__steer .cds--btn {
+  flex-shrink: 0; /* the input yields, the button never squeezes its icon */
 }
 
 /* ---- flow timeline ---- */
@@ -587,4 +600,16 @@
 .af-settings__muted {
   color: var(--cds-text-secondary);
   font-size: 0.875rem;
+}
+
+/* Row links in list tables — read as text, reveal as links on hover. */
+.af-row-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.af-row-link:hover,
+.af-row-link:focus {
+  color: var(--cds-link-primary);
+  text-decoration: underline;
 }

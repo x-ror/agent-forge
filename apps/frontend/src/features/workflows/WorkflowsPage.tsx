@@ -1,4 +1,4 @@
-import { Button, StructuredListBody, StructuredListCell, StructuredListHead, StructuredListRow, StructuredListWrapper, Tag, Tile } from '@carbon/react';
+import { Button, Table, TableBody, TableCell, TableContainer, TableHead, TableHeader, TableRow, Tag, Tile } from '@carbon/react';
 import { Add } from '@carbon/icons-react';
 import { Link, useNavigate } from 'react-router';
 import { useWorkflows } from '../../api/hooks';
@@ -35,28 +35,32 @@ export function WorkflowsPage() {
           <p>Create one on the canvas — the canonical Implement → Review → PR template is one click away.</p>
         </Tile>
       ) : (
-        <StructuredListWrapper>
-          <StructuredListHead>
-            <StructuredListRow head>
-              <StructuredListCell head>Name</StructuredListCell>
-              <StructuredListCell head>Version</StructuredListCell>
-              <StructuredListCell head>Enabled</StructuredListCell>
-            </StructuredListRow>
-          </StructuredListHead>
-          <StructuredListBody>
-            {(workflows.data ?? []).map((workflow) => (
-              <StructuredListRow key={workflow.id}>
-                <StructuredListCell>
-                  <Link to={`/workflows/${workflow.id}`}>{workflow.name}</Link>
-                </StructuredListCell>
-                <StructuredListCell>v{workflow.version}</StructuredListCell>
-                <StructuredListCell>
-                  <Tag type={workflow.enabled ? 'green' : 'gray'}>{workflow.enabled ? 'enabled' : 'disabled'}</Tag>
-                </StructuredListCell>
-              </StructuredListRow>
-            ))}
-          </StructuredListBody>
-        </StructuredListWrapper>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeader>Name</TableHeader>
+                <TableHeader>Version</TableHeader>
+                <TableHeader>Enabled</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(workflows.data ?? []).map((workflow) => (
+                <TableRow key={workflow.id}>
+                  <TableCell>
+                    <Link className="af-row-link" to={`/workflows/${workflow.id}`}>
+                      {workflow.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="af-cell--nowrap">v{workflow.version}</TableCell>
+                  <TableCell>
+                    <Tag type={workflow.enabled ? 'green' : 'gray'}>{workflow.enabled ? 'enabled' : 'disabled'}</Tag>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
     </div>
   );
