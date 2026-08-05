@@ -288,3 +288,20 @@ Running log per implementation-cycle prompt. Newest phase last.
 **Epics as filters (final board design):** a task can belong to several epics (their repo's index/roadmap/thematic epics overlap), so exclusive tree parentage was the wrong model — sync now records set membership (`meta.parentExternalKeys[]`, body task-lists + native sub-issue links merged), and the board renders epics as filter chips with progress (`19/24`) above a flat, actionable task list instead of rows in it. Chips filter by membership; the active epic shows a context line (progress, open-on-board count, source link). This deleted the tree/expansion machinery entirely.
 
 **Epics removed:** the epic experiments (tree nesting, then filter chips over set membership) were pulled back out — deriving reliable hierarchy from labeled issues + body task-lists proved too fragile to ship (partial syncs, closed-issue refs, index epics referencing everything). Sync is back to plain issue/checklist import (`meta`: url/number/labels only), and the board is a flat actionable list. Kept from the exercise: title→source-issue links, Intl date cells, the 200-task board page, and the `.af-app` themed viewport.
+
+---
+
+## Post-ship — feature wave: management UX, sync lifecycle, PR loop, quality gates, local LLMs (done)
+
+Ten phases, each deployed and committed separately:
+
+1. **Management UX** — edit project (incl. defaultBranch), edit agent (adapter switch, model ComboBox prefilled + custom, options, prompt), specialists attach to agents (brief joins the system prompt; canvas lists runtime agents only), PAT revoke, task-source delete.
+2. **Sync correctness** — paginated GitHub issue fetch (cap 1000, completeness flag); reconciliation retires tracked tasks whose issue closed (backlog/failed → done, never local in_flow) only on provably-complete fetches.
+3. **PR loop** — PR body carries `Closes #N` from the task's externalKey; PR URL was already in context/UI.
+4. **Flow Runs readability** — list rows show task title + workflow + project (raw cross-context joins).
+5. **Adapter-agnostic decisions** — claude-code decision runs get a mandatory `DECISION: {route, reasoning}` answer format, parsed into structured output; capability flipped true.
+6. **Quality gates** — `gate.quality {commands, fixerAgent?, maxRounds?}`: commands run in the flow worktree; failures loop through a fixer-agent run (same worktree) up to maxRounds inside one acyclic step; e2e-tested pass/fail paths.
+7. **Usage & cost** — per-day aggregates endpoint + Settings panel with 30-day totals.
+8. **Notifications** — tab-title badge + browser notifications on awaiting_input/failed transitions.
+9. **Scheduled syncs** — worker scheduler honors sync_cron as intervals (N-min/hourly/daily).
+10. **Local LLMs** — README recipe for Ollama/LM Studio via api-loop's OpenAI-compatible provider; worker gets host-gateway alias.

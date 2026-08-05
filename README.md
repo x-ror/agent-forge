@@ -51,6 +51,27 @@ Integration tests use testcontainers — they start their own Postgres/Redis and
 
 Postgres is the single source of truth; Redis carries only BullMQ jobs and pub/sub wake-ups and can be flushed at any time — reconciliation rebuilds it from Postgres (§5.4). All cross-process effects go through a transactional outbox. The api process is stateless (REST + SSE with durable cursors); the worker owns the outbox dispatcher, the flow engine (a stateless process manager over `flow_runs`/`flow_steps`), the run orchestrator (sandboxes, adapter lifecycles, lease heartbeats) and all credentials. `run_events` and `outbox_events` are append-only at the grant *and* trigger level. See `AgentForge — Technical Design Document.md` for the full design and `PROGRESS.md` for the build log.
 
+## Local LLMs (no API key required)
+
+The `api-loop` adapter speaks to any OpenAI-compatible server, which includes Ollama and LM Studio — so triage/review/decision agents can run entirely on your machine:
+
+1. Run a local server, e.g. `ollama serve` (default `http://localhost:11434`) and pull a model: `ollama pull qwen3`.
+2. In **Settings → Agents**, register (or edit) an agent with adapter `api-loop`, model set to your local model id (type a custom value, e.g. `qwen3`), and options:
+
+   ```json
+   { "provider": "openai", "baseUrl": "http://host.docker.internal:11434" }
+   ```
+
+3. Store any non-empty `OPENAI_API_KEY` project secret (local servers ignore it, the adapter requires one to be present).
+4. Compose runs the worker in a container, so `localhost` is the container — use `host.docker.internal` and add to the worker service in `docker-compose.yml` if it can't resolve:
+
+   ```yaml
+   extra_hosts:
+     - 'host.docker.internal:host-gateway'
+   ```
+
+The `claude-code` adapter keeps working with your Claude subscription (`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`) — mix both in one workflow: local models for decisions, Claude for implementation.
+
 ## Operations
 
 - **Backup / restore**: [docs/backup-restore.md](docs/backup-restore.md) — `pg_dump` + volumes; Redis is intentionally excluded.
