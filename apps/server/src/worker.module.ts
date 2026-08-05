@@ -14,6 +14,7 @@ import { RedisModule } from './shared/redis/redis.module';
 import { WorkerHeartbeat } from './worker/heartbeat.service';
 import { ProcessorsService } from './worker/processors.service';
 import { ReconciliationService } from './worker/reconciliation.service';
+import { SyncSchedulerService } from './worker/sync-scheduler.service';
 
 @Injectable()
 export class WorkerLifecycle implements OnModuleInit, OnApplicationShutdown {
@@ -21,18 +22,21 @@ export class WorkerLifecycle implements OnModuleInit, OnApplicationShutdown {
     private readonly dispatcher: OutboxDispatcher,
     private readonly reconciliation: ReconciliationService,
     private readonly heartbeat: WorkerHeartbeat,
+    private readonly syncScheduler: SyncSchedulerService,
   ) {}
 
   onModuleInit(): void {
     this.dispatcher.start();
     this.reconciliation.start();
     this.heartbeat.start();
+    this.syncScheduler.start();
   }
 
   onApplicationShutdown(): void {
     this.dispatcher.stop();
     this.reconciliation.stop();
     this.heartbeat.stop();
+    this.syncScheduler.stop();
   }
 }
 
@@ -50,6 +54,6 @@ export class WorkerLifecycle implements OnModuleInit, OnApplicationShutdown {
     NotificationsModule,
     OrchestrationModule,
   ],
-  providers: [OutboxDispatcher, ReconciliationService, WorkerHeartbeat, WorkerLifecycle, ProcessorsService],
+  providers: [OutboxDispatcher, ReconciliationService, SyncSchedulerService, WorkerHeartbeat, WorkerLifecycle, ProcessorsService],
 })
 export class WorkerModule {}
