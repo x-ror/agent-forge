@@ -23,7 +23,7 @@ describe('JiraProvider', () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
       calls.push(String(url));
-      expect((init?.headers as Record<string, string>).authorization).toBe(`Basic ${Buffer.from('me@co.test:tok').toString('base64')}`);
+      expect(((init ?? {}).headers as Record<string, string>).authorization).toBe(`Basic ${Buffer.from('me@co.test:tok').toString('base64')}`);
       const startAt = Number(new URL(String(url)).searchParams.get('startAt'));
       const issues =
         startAt === 0
