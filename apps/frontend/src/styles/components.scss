@@ -25,11 +25,18 @@
 }
 
 /* The picker sits in the header bar — strip the form-field chrome (gray fill
-   + underline) so it reads as part of the header, not a stray input. */
+   + underline) so it reads as part of the header, not a stray input, and
+   size it to the project name instead of a fixed box (no trailing gap). */
 .af-shell__project-picker {
-  width: 13rem;
   display: flex;
   align-items: center; /* center the 32px dropdown inside the 48px header */
+
+  .cds--dropdown__wrapper,
+  .cds--list-box__wrapper,
+  .cds--dropdown,
+  .cds--list-box__field {
+    width: auto;
+  }
 
   .cds--dropdown {
     background: transparent;
@@ -40,8 +47,21 @@
     background: var(--cds-background-hover);
   }
 
+  .cds--list-box__field {
+    padding-right: 2.25rem; /* room for the absolutely-positioned chevron */
+  }
+
   .cds--list-box__label {
     color: var(--cds-text-primary);
+    max-width: 16rem; /* very long project names truncate, not stretch */
+  }
+
+  /* The open menu shouldn't inherit the shrunk trigger width; hang it from
+     the right edge so it never overflows the viewport. */
+  .cds--list-box__menu {
+    min-width: 13rem;
+    left: auto;
+    right: 0;
   }
 }
 
@@ -56,6 +76,27 @@
 }
 
 /* ---- tables ---- */
+/* One background: the page already paints --cds-background — don't stack a
+   second panel behind the table title, toolbar, and rows. The column-header
+   band (thead) and row hover keep their own tones for structure. */
+.cds--data-table-header,
+.cds--table-toolbar,
+.cds--data-table tbody tr,
+.cds--data-table tbody tr td {
+  background: transparent;
+}
+
+/* Flat header = no panel to inset from: title/description align with the
+   table's left edge instead of floating 1rem inside it. */
+.cds--data-table-header {
+  padding-inline: 0;
+}
+
+.cds--data-table tbody tr:hover,
+.cds--data-table tbody tr:hover td {
+  background: var(--cds-layer-hover);
+}
+
 .af-cell--nowrap {
   white-space: nowrap;
 }
