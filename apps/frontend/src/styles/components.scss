@@ -16,12 +16,20 @@
 }
 
 /* ---- shell ---- */
-/* No sidebar: nav lives in the header, content is centered full-width. */
-.af-shell__content {
+/* No sidebar: nav lives in the header, content is centered full-width.
+   Carbon clears the fixed header with margin-top: 3rem — but that margin
+   collapses through body onto html and adds phantom 48px of page scroll on
+   every page. Clearance lives as padding instead (padding never collapses):
+   5rem = 3rem header + Carbon's own 2rem content padding. */
+main.af-shell__content {
   max-width: 104rem;
   width: 100%;
   margin: 0 auto;
-  min-height: calc(100vh - 3rem); /* viewport minus the 48px header */
+  /* element+class beats Carbon's .cds--content margin-block-start: 3rem
+     regardless of stylesheet order */
+  margin-block-start: 0 !important;
+  padding-top: 5rem;
+  min-height: 100vh;
 }
 
 /* The picker sits in the header bar — strip the form-field chrome (gray fill
