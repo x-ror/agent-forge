@@ -40,6 +40,8 @@ export interface TickOps {
   /** Latest diff artifact content of a run. */
   latestDiff(runId: string): Promise<string | null>;
   agentIdByName(ownerId: string, name: string): Promise<string | null>;
+  /** Re-point a step at a (fixer) run — or null once that run is consumed. */
+  updateStepRun(stepId: string, runId: string | null): Promise<void>;
 }
 
 export interface OrchestrationTxPort {
@@ -59,3 +61,10 @@ export interface FlowRunAggregate {
 }
 
 export const ORCHESTRATION_TX = Symbol('OrchestrationTxPort');
+
+/** Shell execution for quality-gate commands (worker-side, in the worktree). */
+export interface ShellPort {
+  run(command: string, cwd: string, timeoutMs: number): Promise<{ code: number; output: string }>;
+}
+
+export const SHELL_PORT = Symbol('ShellPort');

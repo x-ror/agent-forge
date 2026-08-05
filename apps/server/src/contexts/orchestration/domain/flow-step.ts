@@ -1,4 +1,4 @@
-export type FlowStepKind = 'trigger' | 'action' | 'agent' | 'decision' | 'gate';
+export type FlowStepKind = 'trigger' | 'action' | 'agent' | 'decision' | 'gate' | 'quality';
 export type FlowStepStatus = 'running' | 'awaiting_input' | 'succeeded' | 'failed' | 'cancelled' | 'skipped';
 
 export interface FlowStepDecision {

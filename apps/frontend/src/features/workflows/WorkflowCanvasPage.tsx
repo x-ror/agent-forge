@@ -16,6 +16,7 @@ const NODE_TYPES: Array<{ type: WorkflowNode['type']; label: string }> = [
   { type: 'decision.agent', label: 'Agent decision' },
   { type: 'decision.rule', label: 'Rule decision' },
   { type: 'gate.human', label: 'Human gate' },
+  { type: 'gate.quality', label: 'Quality gate (commands + fixer)' },
   { type: 'action.open_pr', label: 'Open PR' },
   { type: 'action.notify', label: 'Notify' },
 ];
@@ -123,6 +124,54 @@ function Inspector({
             } as WorkflowNode)
           }
         />
+      )}
+      {wf.type === 'gate.quality' && (
+        <>
+          <TextArea
+            id="node-commands"
+            labelText="Commands (one per line, run in the worktree)"
+            helperText="e.g. make fmt / make test — first failure stops and goes to the fixer"
+            rows={4}
+            value={wf.commands.join('\n')}
+            onChange={(e) =>
+              onChangeNode({
+                ...wf,
+                commands: e.target.value
+                  .split('\n')
+                  .map((c) => c.trim())
+                  .filter(Boolean),
+              } as WorkflowNode)
+            }
+          />
+          <Select
+            id="node-fixer"
+            labelText="Fixer agent (optional)"
+            value={wf.fixerAgent ?? ''}
+            onChange={(e) => {
+              const next = { ...wf } as WorkflowNode & { fixerAgent?: string };
+              if (e.target.value) next.fixerAgent = e.target.value;
+              else delete next.fixerAgent;
+              onChangeNode(next);
+            }}
+          >
+            <SelectItem value="" text="— none: gate just passes/fails —" />
+            {agents.map((name) => (
+              <SelectItem key={name} value={name} text={name} />
+            ))}
+          </Select>
+          <TextInput
+            id="node-max-rounds"
+            labelText="Max fixer rounds (default 2)"
+            value={String(wf.maxRounds ?? '')}
+            onChange={(e) => {
+              const parsed = Number(e.target.value);
+              const next = { ...wf } as WorkflowNode & { maxRounds?: number };
+              if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 5) next.maxRounds = parsed;
+              else delete next.maxRounds;
+              onChangeNode(next);
+            }}
+          />
+        </>
       )}
       {'title' in wf && wf.type === 'action.open_pr' && (
         <TextInput id="node-title" labelText="PR title template" value={wf.title ?? ''} onChange={(e) => onChangeNode({ ...wf, title: e.target.value })} />

@@ -265,7 +265,7 @@ export const flowStatusSchema = z.enum(['running', 'awaiting_input', 'succeeded'
 export const flowStepDtoSchema = z.object({
   id: z.uuid(),
   nodeId: z.string(),
-  kind: z.enum(['trigger', 'action', 'agent', 'decision', 'gate']),
+  kind: z.enum(['trigger', 'action', 'agent', 'decision', 'gate', 'quality']),
   status: z.string(),
   runId: z.uuid().nullable(),
   decision: z.object({ route: z.string(), reasoning: z.string() }).nullable(),

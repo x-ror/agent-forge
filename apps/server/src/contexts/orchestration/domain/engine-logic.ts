@@ -33,6 +33,7 @@ export function stepKindFor(node: WorkflowNode): FlowStep['kind'] {
   if (node.type === 'action.agent') return 'agent';
   if (node.type.startsWith('decision.')) return 'decision';
   if (node.type === 'gate.human') return 'gate';
+  if (node.type === 'gate.quality') return 'quality';
   return 'action';
 }
 

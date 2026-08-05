@@ -50,6 +50,16 @@ export const workflowNodeSchema = z.discriminatedUnion('type', [
     message: z.string().optional(),
     timeoutMinutes: z.number().int().positive().optional(),
   }),
+  z.object({
+    id: nodeId,
+    type: z.literal('gate.quality'),
+    /** Shell commands run in the flow worktree, in order; first failure stops. */
+    commands: z.array(z.string().min(1).max(500)).min(1).max(10),
+    /** Runtime agent that gets the failing output and tries to fix; omit to just pass/fail. */
+    fixerAgent: z.string().min(1).optional(),
+    /** Fixer attempts before the gate fails (default 2). */
+    maxRounds: z.number().int().min(1).max(5).optional(),
+  }),
   z.object({ id: nodeId, type: z.literal('action.open_pr'), title: z.string().optional() }),
   z.object({
     id: nodeId,
@@ -101,6 +111,8 @@ function allowedConditions(node: WorkflowNode): (on: string) => boolean {
       return (on) => on.startsWith('route:') || on === 'failed';
     case 'gate.human':
       return (on) => on === 'approved' || on === 'rejected';
+    case 'gate.quality':
+      return (on) => on === 'succeeded' || on === 'failed';
   }
 }
 

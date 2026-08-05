@@ -5,7 +5,7 @@ import { EventTypes } from '../../../shared/outbox/integration-event';
 import { ScmService } from '../../scm/application/scm.service';
 import { capDiff, coerceRoute, evaluateRules, matchingEdges, nodeById, stepKindFor, stepOutcome, summarizeDiff } from '../domain/engine-logic';
 import type { FlowStep } from '../domain/flow-step';
-import { ORCHESTRATION_TX, type OrchestrationTxPort, type TickOps, type TickState } from '../domain/ports';
+import { ORCHESTRATION_TX, SHELL_PORT, type OrchestrationTxPort, type ShellPort, type TickOps, type TickState } from '../domain/ports';
 
 const DEFAULT_GATE_TIMEOUT_MINUTES = 24 * 60;
 
@@ -13,8 +13,11 @@ const DEFAULT_GATE_TIMEOUT_MINUTES = 24 * 60;
 interface SideEffect {
   stepId: string;
   nodeId: string;
-  kind: 'worktree' | 'open_pr';
+  kind: 'worktree' | 'open_pr' | 'quality';
 }
+
+const QUALITY_COMMAND_TIMEOUT_MS = 10 * 60_000;
+const QUALITY_DEFAULT_MAX_ROUNDS = 2;
 
 /**
  * The workflow engine (§7.3): a stateless process manager. One tick =
@@ -28,6 +31,7 @@ export class FlowEngine {
 
   constructor(
     @Inject(ORCHESTRATION_TX) private readonly otx: OrchestrationTxPort,
+    @Inject(SHELL_PORT) private readonly shell: ShellPort,
     private readonly scm: ScmService,
   ) {}
 
@@ -54,6 +58,16 @@ export class FlowEngine {
     await this.expireTimedOutGates(ops, state);
 
     const effects: SideEffect[] = [];
+    // Quality gates whose fixer run finished re-check their commands. The
+    // runId is consumed inside this tx so each fixer round re-checks once.
+    for (const step of state.steps) {
+      if (step.kind !== 'quality' || step.status !== 'running' || !step.runId) continue;
+      const run = await ops.runInfo(step.runId);
+      if (run && (run.status === 'succeeded' || run.status === 'failed' || run.status === 'cancelled')) {
+        await ops.updateStepRun(step.id, null);
+        effects.push({ stepId: step.id, nodeId: step.nodeId, kind: 'quality' });
+      }
+    }
     // Policy: agents try once. `failed` blocks re-entry until the user hits
     // Resume (which marks those steps skipped). Never auto-retry agents.
     const started = new Set(
@@ -227,6 +241,11 @@ export class FlowEngine {
         return null;
       }
 
+      case 'gate.quality': {
+        await ops.insertStep(base);
+        return { stepId, nodeId: node.id, kind: 'quality' };
+      }
+
       case 'gate.human': {
         await ops.insertStep({ ...base, status: 'awaiting_input' });
         if (state.flow.status === 'running') await ops.setFlowStatus('awaiting_input');
@@ -290,6 +309,8 @@ export class FlowEngine {
     try {
       if (effect.kind === 'worktree') {
         await this.performWorktree(flowRunId, effect);
+      } else if (effect.kind === 'quality') {
+        await this.performQualityGate(flowRunId, effect);
       } else {
         await this.performOpenPr(flowRunId, effect);
       }
@@ -329,6 +350,122 @@ export class FlowEngine {
       });
       await ops.completeStep(effect.stepId, 'succeeded');
       return [];
+    });
+  }
+
+  /**
+   * Quality gate (user's pre-PR checks): run the configured commands in the
+   * flow worktree; on first failure hand the output to the fixer agent (a
+   * real run on the same worktree) and re-check when it finishes — up to
+   * maxRounds, then the step fails honestly. The workflow graph stays
+   * acyclic: the loop lives inside this one step.
+   */
+  private async performQualityGate(flowRunId: string, effect: SideEffect): Promise<void> {
+    const setup = await this.otx.withFlowTick(flowRunId, async (ops) => {
+      const state = ops.state();
+      const node = nodeById(state.definition, effect.nodeId);
+      if (!node || node.type !== 'gate.quality') return null;
+      const worktree = state.flow.context.worktree as { path?: string; branch?: string; baseRef?: string } | undefined;
+      const stepCtx = (state.flow.context.steps as Record<string, Record<string, Json>> | undefined)?.[effect.nodeId];
+      return {
+        node,
+        worktreePath: worktree?.path ?? null,
+        branch: worktree?.branch ?? null,
+        baseRef: worktree?.baseRef ?? state.defaultBranch,
+        round: typeof stepCtx?.qualityRound === 'number' ? stepCtx.qualityRound : 0,
+        ownerId: state.projectOwnerId,
+      };
+    });
+    if (!setup) return;
+    if (!setup.worktreePath) {
+      await this.otx.withFlowTick(flowRunId, async (ops) => {
+        await ops.completeStep(effect.stepId, 'failed');
+        await ops.mergeFlowContext({ steps: { [effect.nodeId]: { status: 'failed', error: 'quality gate: no worktree in flow context' } } });
+      });
+      return;
+    }
+
+    // Commands run outside the tx — they can take minutes.
+    let failed: { command: string; output: string } | null = null;
+    const passed: string[] = [];
+    for (const command of setup.node.commands) {
+      const result = await this.shell.run(command, setup.worktreePath, QUALITY_COMMAND_TIMEOUT_MS);
+      if (result.code === 0) {
+        passed.push(command);
+      } else {
+        failed = { command, output: result.output };
+        break;
+      }
+    }
+
+    const maxRounds = setup.node.maxRounds ?? QUALITY_DEFAULT_MAX_ROUNDS;
+    await this.otx.withFlowTick(flowRunId, async (ops) => {
+      if (!failed) {
+        await ops.completeStep(effect.stepId, 'succeeded');
+        await ops.mergeFlowContext({
+          steps: { [effect.nodeId]: { status: 'succeeded', qualityRound: setup.round, commands: setup.node.commands.join(' && ') } },
+        });
+        return;
+      }
+
+      const fixerAgent = setup.node.fixerAgent;
+      const budgetLeft = setup.round < maxRounds;
+      const agentId = fixerAgent && budgetLeft ? await ops.agentIdByName(setup.ownerId, fixerAgent) : null;
+      if (!agentId) {
+        await ops.completeStep(effect.stepId, 'failed');
+        await ops.mergeFlowContext({
+          steps: {
+            [effect.nodeId]: {
+              status: 'failed',
+              qualityRound: setup.round,
+              command: failed.command,
+              output: failed.output.slice(-8_000),
+              error:
+                fixerAgent && budgetLeft
+                  ? `quality gate: fixer agent "${fixerAgent}" not found`
+                  : fixerAgent
+                    ? `quality gate: still failing after ${setup.round} fixer round(s)`
+                    : `quality gate: \`${failed.command}\` failed`,
+            },
+          },
+        });
+        return;
+      }
+
+      const runId = uuidv7();
+      await ops.insertRun({
+        runId,
+        agentId,
+        prompt: [
+          `The pre-merge quality gate failed in this repository worktree. Fix the underlying problem, keep the change minimal, and do not disable or skip checks.`,
+          ``,
+          `Failing command: \`${failed.command}\``,
+          passed.length > 0 ? `Already passing: ${passed.join(', ')}` : '',
+          ``,
+          '```',
+          failed.output.slice(-8_000),
+          '```',
+          ``,
+          `After fixing, the command must exit 0. All of these must stay green: ${setup.node.commands.join(', ')}.`,
+        ]
+          .filter((line) => line !== '')
+          .join('\n'),
+        baseRef: setup.baseRef,
+        workspacePath: setup.worktreePath,
+        branch: setup.branch,
+        structured: null,
+      });
+      await ops.updateStepRun(effect.stepId, runId);
+      await ops.mergeFlowContext({
+        steps: {
+          [effect.nodeId]: {
+            status: 'fixing',
+            qualityRound: setup.round + 1,
+            command: failed.command,
+            fixerRunId: runId,
+          },
+        },
+      });
     });
   }
 

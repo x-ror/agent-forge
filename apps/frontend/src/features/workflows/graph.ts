@@ -84,6 +84,8 @@ export function freshNode(type: WorkflowNode['type']): WorkflowNode {
       return { id, type, routes: ['big', 'small'], rules: [{ when: 'steps.implement.diff_lines > 300', route: 'big' }], defaultRoute: 'small' };
     case 'gate.human':
       return { id, type, message: 'Approve to continue' };
+    case 'gate.quality':
+      return { id, type, commands: ['make test'], maxRounds: 2 };
     case 'action.open_pr':
       return { id, type, title: '{{task.external_key}}: {{task.title}}' };
     case 'action.notify':

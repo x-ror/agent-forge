@@ -22,6 +22,12 @@ class EmTickOps implements TickOps {
     return this.tickState;
   }
 
+  async updateStepRun(stepId: string, runId: string | null): Promise<void> {
+    await this.em.getRepository(FlowStepEntity).update({ id: stepId }, { runId });
+    const step = this.tickState.steps.find((s) => s.id === stepId);
+    if (step) step.runId = runId;
+  }
+
   async completeStep(stepId: string, status: FlowStepStatus, opts: { decision?: FlowStepDecision } = {}): Promise<void> {
     await this.em.getRepository(FlowStepEntity).update(
       { id: stepId },

@@ -20,6 +20,7 @@ import { ReconciliationService } from '../../src/worker/reconciliation.service';
 import { ScmService } from '../../src/contexts/scm/application/scm.service';
 import { FlowEngine } from '../../src/contexts/orchestration/application/flow-engine.service';
 import { OrchestrationTxOps } from '../../src/contexts/orchestration/infrastructure/orchestration-tx';
+import { LocalShellAdapter } from '../../src/contexts/orchestration/infrastructure/shell.adapter';
 import { GitCli } from '../../src/contexts/scm/infrastructure/git-cli';
 import { GithubClient } from '../../src/contexts/scm/infrastructure/github-client';
 import { TypeormArtifactRepository } from '../../src/contexts/execution/infrastructure/typeorm-repositories';
@@ -74,7 +75,7 @@ export function buildTestWorker(ds: DataSource, redisUrl: string, redisClient: R
 
   const dispatcher = new OutboxDispatcher(ds, redisClient, queueMap);
   const reconciliation = new ReconciliationService(ds, queueMap);
-  const flowEngine = new FlowEngine(new OrchestrationTxOps(uow, outboxWriter), scm);
+  const flowEngine = new FlowEngine(new OrchestrationTxOps(uow, outboxWriter), new LocalShellAdapter(), scm);
 
   const bullWorker = new Worker(
     'run.execute',

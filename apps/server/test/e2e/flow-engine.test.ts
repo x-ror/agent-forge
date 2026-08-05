@@ -316,6 +316,48 @@ describe('Phase 8 e2e: the workflow engine', () => {
     expect(gate.decision?.reasoning).toBe('lgtm');
   });
 
+  it('gate.quality runs commands in the worktree: pass → succeeded, fail (no fixer) → flow failed', async () => {
+    const makeQualityWorkflow = async (name: string, command: string) => {
+      const res = await http.post('/workflows', {
+        projectId,
+        name,
+        definition: {
+          nodes: [
+            { id: 'start', type: 'trigger.task_selected' },
+            { id: 'worktree', type: 'action.create_worktree' },
+            { id: 'quality', type: 'gate.quality', commands: [command] },
+            { id: 'note', type: 'action.notify', channel: 'log', message: 'green' },
+          ],
+          edges: [
+            { from: 'start', to: 'worktree', on: 'succeeded' },
+            { from: 'worktree', to: 'quality', on: 'succeeded' },
+            { from: 'quality', to: 'note', on: 'succeeded' },
+          ],
+        },
+      });
+      expect(res.status).toBe(201);
+      return (res.body as { id: string }).id;
+    };
+
+    const passId = await makeQualityWorkflow('quality-pass', 'test -f README.md || true');
+    const passStart = await http.post('/flow-runs', { workflowId: passId, taskId: await makeTask('Quality pass') });
+    const passFlow = (passStart.body as { id: string }).id;
+    expect(await waitFlow(passFlow, ['succeeded', 'failed'])).toBe('succeeded');
+    const passDetail = (await http.get(`/flow-runs/${passFlow}`)).body as { steps: Array<{ nodeId: string; status: string }> };
+    expect(passDetail.steps.find((s) => s.nodeId === 'quality')?.status).toBe('succeeded');
+
+    const failId = await makeQualityWorkflow('quality-fail', 'echo "lint error: broken" && exit 1');
+    const failStart = await http.post('/flow-runs', { workflowId: failId, taskId: await makeTask('Quality fail') });
+    const failFlow = (failStart.body as { id: string }).id;
+    expect(await waitFlow(failFlow, ['succeeded', 'failed'])).toBe('failed');
+    const failDetail = (await http.get(`/flow-runs/${failFlow}`)).body as {
+      steps: Array<{ nodeId: string; status: string }>;
+      context: { steps?: Record<string, { output?: string; error?: string }> };
+    };
+    expect(failDetail.steps.find((s) => s.nodeId === 'quality')?.status).toBe('failed');
+    expect(failDetail.context.steps?.quality?.output).toContain('lint error: broken');
+  });
+
   it('gate rejection fails the flow honestly', async () => {
     const wf = await http.post('/workflows', {
       projectId,
