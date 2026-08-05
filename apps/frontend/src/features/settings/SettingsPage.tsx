@@ -496,14 +496,39 @@ function SourcesSection() {
   const createSource = useCreateTaskSource();
   const deleteSource = useDeleteTaskSource();
   const [kind, setKind] = useState('github_issues');
+  const [jiraProject, setJiraProject] = useState('');
+  const [jiraJql, setJiraJql] = useState('');
+  const [filePath, setFilePath] = useState('');
+  const [ghLabels, setGhLabels] = useState('');
   if (!projectId) return <p>Select a project first.</p>;
+
+  const buildConfig = (): Record<string, unknown> => {
+    if (kind === 'jira') {
+      if (jiraJql.trim()) return { jql: jiraJql.trim() };
+      if (jiraProject.trim()) return { project: jiraProject.trim() };
+      return {};
+    }
+    if (kind === 'file') return filePath.trim() ? { path: filePath.trim() } : {};
+    if (kind === 'github_issues' && ghLabels.trim()) {
+      return {
+        labels: ghLabels
+          .split(',')
+          .map((l) => l.trim())
+          .filter(Boolean),
+      };
+    }
+    return {};
+  };
   return (
     <Stack gap={5}>
       <StructuredListWrapper>
         <StructuredListBody>
           {(sources.data ?? []).map((source) => (
             <StructuredListRow key={source.id}>
-              <StructuredListCell>{sourceKindLabel(source.kind)}</StructuredListCell>
+              <StructuredListCell>
+                {sourceKindLabel(source.kind)}
+                {Object.keys(source.config).length > 0 && <span className="af-settings__muted"> · {JSON.stringify(source.config)}</span>}
+              </StructuredListCell>
               <StructuredListCell className="af-cell--nowrap">{source.lastSyncedAt ? `synced ${formatDateTime(source.lastSyncedAt)}` : 'never synced'}</StructuredListCell>
               <StructuredListCell className="af-cell--nowrap">
                 <Button
@@ -524,7 +549,7 @@ function SourcesSection() {
         aria-label="new source"
         onSubmit={(e) => {
           e.preventDefault();
-          createSource.mutate({ projectId, kind: kind as never, config: {} });
+          createSource.mutate({ projectId, kind: kind as never, config: buildConfig() });
         }}
       >
         <Stack gap={4}>
@@ -533,6 +558,38 @@ function SourcesSection() {
             <SelectItem value="file" text="Tracked file (TASKS.md)" />
             <SelectItem value="jira" text="Jira" />
           </Select>
+          {kind === 'jira' && (
+            <>
+              <p className="af-settings__tab-desc">
+                Credentials come from project secrets: <code>JIRA_BASE_URL</code>, <code>JIRA_API_TOKEN</code> (+ <code>JIRA_EMAIL</code> for Jira Cloud). Below only scopes{' '}
+                <em>which</em> issues sync.
+              </p>
+              <TextInput
+                id="source-jira-project"
+                labelText="Jira project key (optional)"
+                helperText="e.g. ABC — syncs the project's open issues"
+                value={jiraProject}
+                onChange={(e) => setJiraProject(e.target.value)}
+              />
+              <TextInput
+                id="source-jira-jql"
+                labelText="JQL (optional — overrides project key)"
+                helperText="e.g. assignee = currentUser() AND sprint in openSprints()"
+                value={jiraJql}
+                onChange={(e) => setJiraJql(e.target.value)}
+              />
+            </>
+          )}
+          {kind === 'file' && <TextInput id="source-file-path" labelText="File path (default TASKS.md)" value={filePath} onChange={(e) => setFilePath(e.target.value)} />}
+          {kind === 'github_issues' && (
+            <TextInput
+              id="source-gh-labels"
+              labelText="Labels filter (comma-separated, optional)"
+              helperText="Sync only issues carrying all of these labels"
+              value={ghLabels}
+              onChange={(e) => setGhLabels(e.target.value)}
+            />
+          )}
           <Button type="submit" size="sm" disabled={createSource.isPending}>
             Add source
           </Button>
