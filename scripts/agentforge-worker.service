@@ -1,0 +1,18 @@
+[Unit]
+Description=AgentForge worker (host — sees the local toolchain: odin, vp, make, claude)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=x-ror
+WorkingDirectory=/home/x-ror/agent-forge/apps/server
+Environment=AGENTFORGE_ENV_FILE=/home/x-ror/agent-forge/.env.worker-host
+Environment=HOME=/home/x-ror
+Environment=PATH=/home/x-ror/.vite-plus/bin:/home/x-ror/.local/bin:/home/x-ror/.bun/bin:/home/x-ror/Odin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/x-ror/.vite-plus/bin/node dist/main.worker.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:18
     restart: unless-stopped
+    ports:
+      - '127.0.0.1:5432:5432' # host worker only — not exposed beyond loopback
     volumes:
       # PG 18 images expect the mount at /var/lib/postgresql (not .../data).
       - pgdata:/var/lib/postgresql
@@ -17,6 +19,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    ports:
+      - '127.0.0.1:6379:6379' # host worker only — not exposed beyond loopback
     # AOF is a nice-to-have; the system survives total Redis loss (§5.4).
     # Empty requirepass = auth disabled; set REDIS_PASSWORD in .env.
     command: ['redis-server', '--appendonly', 'yes', '--requirepass', '${REDIS_PASSWORD:-}']
@@ -40,8 +44,10 @@ services:
     volumes:
       # Needed so Discard session (abandon) can remove flow worktrees from the API process.
       # Worker still owns create/push; api only cleans up on abandon.
-      - workspaces:/data/workspaces
-      - artifacts:/data/artifacts
+      # Bind mounts (not named volumes): the worker runs ON THE HOST with the
+      # same absolute paths, so /data/... means the same thing everywhere.
+      - /data/workspaces:/data/workspaces
+      - /data/artifacts:/data/artifacts
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,6 +69,10 @@ services:
       - api
 
   worker:
+    # The worker normally runs ON THE HOST (systemd agentforge-worker) so
+    # quality gates and agents see the real toolchain (odin, vp, make, claude).
+    # This containerized fallback only starts with: --profile container-worker
+    profiles: ['container-worker']
     restart: unless-stopped
     image: agentforge/server:latest
     extra_hosts:
@@ -79,8 +89,8 @@ services:
       SANDBOX_NETWORK_DEFAULT: ${SANDBOX_NETWORK_DEFAULT:-full}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - workspaces:/data/workspaces
-      - artifacts:/data/artifacts
+      - /data/workspaces:/data/workspaces
+      - /data/artifacts:/data/artifacts
     depends_on:
       postgres:
         condition: service_healthy

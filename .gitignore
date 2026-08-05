@@ -10,3 +10,4 @@ data/
 apps/frontend/dist/
 playwright-report/
 test-results/
+.env.worker-host
