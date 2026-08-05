@@ -174,7 +174,22 @@ function Inspector({
         </>
       )}
       {'title' in wf && wf.type === 'action.open_pr' && (
-        <TextInput id="node-title" labelText="PR title template" value={wf.title ?? ''} onChange={(e) => onChangeNode({ ...wf, title: e.target.value })} />
+        <>
+          <TextInput id="node-title" labelText="PR title template" value={wf.title ?? ''} onChange={(e) => onChangeNode({ ...wf, title: e.target.value })} />
+          <TextArea
+            id="node-body"
+            labelText="PR body template"
+            helperText="{{steps.<id>.summary}}, {{task.title}}, … — Closes #N is appended automatically"
+            rows={4}
+            value={wf.body ?? ''}
+            onChange={(e) => {
+              const next = { ...wf } as WorkflowNode & { body?: string };
+              if (e.target.value.trim()) next.body = e.target.value;
+              else delete next.body;
+              onChangeNode(next);
+            }}
+          />
+        </>
       )}
       {'message' in wf && (
         <TextInput id="node-message" labelText="Message" value={wf.message ?? ''} onChange={(e) => onChangeNode({ ...wf, message: e.target.value } as WorkflowNode)} />

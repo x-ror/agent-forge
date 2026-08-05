@@ -484,6 +484,7 @@ export class FlowEngine {
         worktree,
         runId: lastAgentStep?.runId ?? null,
         title: renderTemplate(node && 'title' in node && node.title ? node.title : 'AgentForge: {{task.title}}', state.flow.context),
+        renderedBody: renderTemplate(node && node.type === 'action.open_pr' && node.body ? node.body : 'Automated by AgentForge for task: {{task.title}}', state.flow.context),
         taskTitle: state.task.title,
         taskExternalKey: state.task.externalKey,
       };

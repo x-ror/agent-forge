@@ -60,7 +60,12 @@ export const workflowNodeSchema = z.discriminatedUnion('type', [
     /** Fixer attempts before the gate fails (default 2). */
     maxRounds: z.number().int().min(1).max(5).optional(),
   }),
-  z.object({ id: nodeId, type: z.literal('action.open_pr'), title: z.string().optional() }),
+  z.object({
+    id: nodeId,
+    type: z.literal('action.open_pr'),
+    title: z.string().optional(),
+    body: z.string().optional(),
+  }),
   z.object({
     id: nodeId,
     type: z.literal('action.notify'),
