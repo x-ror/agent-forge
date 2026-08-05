@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api/client';
 import { useMe, useLogout, useProjects } from './api/hooks';
 import { useAppState } from './state/app-state';
+import { useFlowNotifications } from './features/flows/notifications';
 import { LoginPage } from './features/auth/LoginPage';
 import { SetupWizard } from './features/setup/SetupWizard';
 import { TaskBoardPage } from './features/tasks/TaskBoardPage';
@@ -88,6 +89,17 @@ export default function App() {
       </Theme>
     );
   }
+
+  return <AuthedApp />;
+}
+
+/** Authenticated shell — split out so its hooks never render unauthenticated. */
+function AuthedApp() {
+  const { theme, toggleTheme } = useAppState();
+  const logout = useLogout();
+  const navigate = useNavigate();
+  const location = useLocation();
+  useFlowNotifications();
 
   const nav = [
     { to: '/', label: 'Task Board' },
