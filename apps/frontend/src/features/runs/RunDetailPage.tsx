@@ -1,4 +1,4 @@
-import { ActionableNotification, Button, CodeSnippet, InlineLoading, Tab, TabList, TabPanel, TabPanels, Tabs, TextInput, Tile } from '@carbon/react';
+import { ActionableNotification, Button, CodeSnippet, InlineLoading, InlineNotification, Tab, TabList, TabPanel, TabPanels, Tabs, TextInput, Tile } from '@carbon/react';
 import { Send, StopFilled } from '@carbon/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useQueryClient } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import { api } from '../../api/client';
 import { useRun, useRunDiff, useRunInput } from '../../api/hooks';
 import { useSse } from '../../api/sse';
 import { StatusTag } from '../../components/StatusTag';
+import { formatDateTime, formatDuration } from '../../components/format';
 import { DiffView } from '../diff/DiffView';
 
 function EventRow({ event }: { event: RunEventDto }) {
@@ -25,13 +26,28 @@ function EventRow({ event }: { event: RunEventDto }) {
     case 'user.message':
       body = <span className={event.type === 'agent.thinking' ? 'af-event-row__thinking' : undefined}>{String(payload.text ?? '')}</span>;
       break;
-    case 'tool.start':
-      body = <CodeSnippet type="single" hideCopyButton>{`${String(payload.tool)} ${JSON.stringify(payload.detail ?? {})}`}</CodeSnippet>;
+    case 'tool.start': {
+      const detail = (payload.detail ?? {}) as Record<string, unknown>;
+      // Show the one thing a human scans for, not the whole JSON blob.
+      const gist =
+        typeof detail.file_path === 'string'
+          ? detail.file_path
+          : typeof detail.command === 'string'
+            ? detail.command
+            : typeof detail.pattern === 'string'
+              ? detail.pattern
+              : JSON.stringify(detail).slice(0, 200);
+      body = (
+        <span className="af-event-row__mono">
+          <strong>{String(payload.tool)}</strong> {gist}
+        </span>
+      );
       break;
+    }
     case 'tool.end':
       body = (
         <span className="af-event-row__mono">
-          {String(payload.tool)} {payload.ok ? '✓' : '✗'} {String(payload.output ?? '').slice(0, 400)}
+          {String(payload.tool)} {payload.ok ? '\u2713' : '\u2717'} {String(payload.output ?? '').slice(0, 400)}
         </span>
       );
       break;
@@ -56,8 +72,9 @@ function EventRow({ event }: { event: RunEventDto }) {
     default:
       body = <span className="af-event-row__mono">{JSON.stringify(payload).slice(0, 400)}</span>;
   }
+  const outcome = event.type === 'result' ? String(payload.outcome ?? '') : undefined;
   return (
-    <div className="af-event-row" data-event-type={event.type}>
+    <div className="af-event-row" data-event-type={event.type} data-outcome={outcome}>
       {label}
       {body}
     </div>
@@ -133,10 +150,26 @@ export function RunDetailPage() {
 
   if (!run.data) return <InlineLoading description="Loading run…" />;
 
+  const usage = run.data.usage as { tokensIn?: number; tokensOut?: number; costUsd?: number };
+  const duration = formatDuration(run.data.startedAt ?? run.data.createdAt, run.data.finishedAt);
+
   return (
     <div>
       <div className="af-page__header">
-        <h3 className="af-page__header-title">Run {run.data.id.slice(-8)}</h3>
+        <div>
+          <h3 className="af-page__header-title">Run {run.data.id.slice(-8)}</h3>
+          <p className="af-page__header-desc">
+            started {formatDateTime(run.data.startedAt ?? run.data.createdAt)}
+            {duration && <> · took {duration}</>}
+            {typeof usage.tokensIn === 'number' && (
+              <>
+                {' '}
+                · {usage.tokensIn.toLocaleString()} in / {(usage.tokensOut ?? 0).toLocaleString()} out
+              </>
+            )}
+            {typeof usage.costUsd === 'number' && usage.costUsd > 0 && <> · ${usage.costUsd.toFixed(2)}</>}
+          </p>
+        </div>
         <StatusTag status={run.data.status} />
         {run.data.branch && (
           <CodeSnippet type="single" hideCopyButton>
@@ -149,6 +182,8 @@ export function RunDetailPage() {
           </Button>
         )}
       </div>
+
+      {run.data.error && <InlineNotification kind="error" lowContrast hideCloseButton title="Run failed" subtitle={run.data.error} />}
 
       {pendingPermission && !terminal && (
         <ActionableNotification

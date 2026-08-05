@@ -23,6 +23,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import type { FlowStepDto } from '@agentforge/core';
 import { useAbandonFlow, useFlowDiff, useFlowRun, useResolveGate, useResumeFlow } from '../../api/hooks';
 import { useSse } from '../../api/sse';
+import { formatDateTime, formatDuration } from '../../components/format';
 import { StatusTag } from '../../components/StatusTag';
 import { DiffView } from '../diff/DiffView';
 
@@ -37,9 +38,13 @@ function StepBody({ step, context }: { step: FlowStepDto; context: Record<string
   const stepContext = ((context.steps as Record<string, unknown> | undefined)?.[step.nodeId] ?? {}) as Record<string, unknown>;
   return (
     <div className="af-step-body">
-      <div>
-        <StatusTag status={step.status} /> started {new Date(step.startedAt).toLocaleTimeString()}
-        {step.finishedAt && <> · finished {new Date(step.finishedAt).toLocaleTimeString()}</>}
+      <div className="af-step-body__meta">
+        <StatusTag status={step.status} />
+        <span>
+          {new Date(step.startedAt).toLocaleTimeString()}
+          {step.finishedAt && <> → {new Date(step.finishedAt).toLocaleTimeString()}</>}
+        </span>
+        {formatDuration(step.startedAt, step.finishedAt) && <span className="af-step-body__duration">{formatDuration(step.startedAt, step.finishedAt)}</span>}
       </div>
       {step.decision && (
         <div data-testid={`decision-${step.nodeId}`}>
@@ -99,11 +104,19 @@ export function FlowRunPage() {
   if (!flow.data) return <InlineLoading description="Loading flow…" />;
   const steps = flow.data.steps ?? [];
   const awaitingGate = steps.find((s) => s.kind === 'gate' && s.status === 'awaiting_input');
+  const taskTitle = (flow.data.context as { task?: { title?: string } }).task?.title;
+  const duration = formatDuration(flow.data.startedAt, flow.data.finishedAt);
 
   return (
     <div>
       <div className="af-page__header">
-        <h3 className="af-page__header-title">Flow {flow.data.id.slice(-8)}</h3>
+        <div>
+          <h3 className="af-page__header-title">{taskTitle ?? `Flow ${flow.data.id.slice(-8)}`}</h3>
+          <p className="af-page__header-desc">
+            Flow {flow.data.id.slice(-8)} · started {formatDateTime(flow.data.startedAt)}
+            {duration && <> · took {duration}</>}
+          </p>
+        </div>
         <StatusTag status={flow.data.status} />
         {awaitingGate && (
           <Button kind="primary" size="sm" onClick={() => setGateOpen(true)} data-testid="open-gate">
@@ -137,13 +150,13 @@ export function FlowRunPage() {
         )}
       </div>
       {flow.data.status === 'failed' && (
-        <p className="af-repo-agent__role">
+        <p className="af-page__hint">
           <strong>Retry once</strong> — re-run failed steps (keeps worktree). <strong>Discard session</strong> — delete worktree, cancel flow, return task to backlog so you can
           Start workflow again.
         </p>
       )}
-      {resumeFlow.isError && <p className="af-repo-agent__role">Retry failed: {resumeFlow.error instanceof Error ? resumeFlow.error.message : 'unknown error'}</p>}
-      {abandonFlow.isError && <p className="af-repo-agent__role">Discard failed: {abandonFlow.error instanceof Error ? abandonFlow.error.message : 'unknown error'}</p>}
+      {resumeFlow.isError && <p className="af-page__hint">Retry failed: {resumeFlow.error instanceof Error ? resumeFlow.error.message : 'unknown error'}</p>}
+      {abandonFlow.isError && <p className="af-page__hint">Discard failed: {abandonFlow.error instanceof Error ? abandonFlow.error.message : 'unknown error'}</p>}
 
       <Tabs>
         <TabList aria-label="Flow views">
@@ -157,7 +170,7 @@ export function FlowRunPage() {
               {steps.map((step) => (
                 <AccordionItem
                   key={step.id}
-                  open={step.status === 'running' || step.status === 'awaiting_input'}
+                  open={step.status === 'running' || step.status === 'awaiting_input' || step.status === 'failed'}
                   title={
                     <span className="af-step-title" data-testid={`step-${step.nodeId}`}>
                       <StepIcon status={step.status} />

@@ -343,6 +343,12 @@
 }
 
 /* ---- run detail ---- */
+.af-page__hint {
+  margin: -0.5rem 0 1rem;
+  color: var(--cds-text-secondary);
+  font-size: 0.875rem;
+}
+
 .af-run-feed {
   padding: 0;
 }
@@ -365,8 +371,41 @@
 }
 
 .af-event-row {
-  padding: 0.25rem 0;
+  padding: 0.3rem 0.5rem;
   border-bottom: 1px solid var(--cds-border-subtle);
+  border-left: 2px solid transparent; /* type accent lands here */
+  line-height: 1.45;
+}
+
+/* Type accents: scanning the feed by color beats reading every label. */
+.af-event-row[data-event-type='agent.message'] {
+  border-left-color: var(--cds-support-info);
+}
+
+.af-event-row[data-event-type='tool.start'],
+.af-event-row[data-event-type='tool.end'],
+.af-event-row[data-event-type='file.change'] {
+  border-left-color: var(--cds-border-strong);
+}
+
+.af-event-row[data-event-type='permission.request'] {
+  border-left-color: var(--cds-support-warning);
+  background: var(--cds-layer-01);
+}
+
+.af-event-row[data-event-type='result'][data-outcome='success'] {
+  border-left-color: var(--cds-support-success);
+  background: var(--cds-layer-01);
+}
+
+.af-event-row[data-event-type='result'][data-outcome='failure'] {
+  border-left-color: var(--cds-support-error);
+  background: var(--cds-layer-01);
+}
+
+.af-event-row[data-event-type='orchestrator.status'],
+.af-event-row[data-event-type='usage'] {
+  opacity: 0.75;
 }
 
 .af-event-row__label {
@@ -378,6 +417,10 @@
 .af-event-row__mono {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.75rem;
+}
+
+.af-event-row__mono {
+  word-break: break-word;
 }
 
 .af-event-row__thinking {
@@ -401,6 +444,22 @@
 .af-step-body {
   display: grid;
   gap: 0.5rem;
+}
+
+.af-step-body__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--cds-text-secondary);
+  font-size: 0.875rem;
+}
+
+.af-step-body__duration {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.4rem;
+  background: var(--cds-layer-01);
+  border-radius: 0.25rem;
 }
 
 .af-step-icon--succeeded {
