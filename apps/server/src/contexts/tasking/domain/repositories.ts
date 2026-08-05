@@ -5,7 +5,9 @@ export interface TaskRepository {
   save(task: Task): Promise<void>;
   findById(id: string): Promise<Task | null>;
   /** Sync upsert on (source_id, external_key); returns the task id. */
-  upsertSynced(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id: string }): Promise<string>;
+  /** sourceCreatedAt: creation time at the source (GitHub issue) — the board
+   *  sorts newest-first by created_at, so source order survives the sync. */
+  upsertSynced(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id: string; sourceCreatedAt?: Date }): Promise<string>;
   /** Keyset-paginated board listing (cursor = last task id). */
   listBoard(projectId: string, opts?: { status?: TaskStatus; cursor?: string; limit?: number }): Promise<Task[]>;
 }

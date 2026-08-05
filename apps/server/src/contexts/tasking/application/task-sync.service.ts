@@ -53,6 +53,7 @@ export class TaskSyncService {
         body: task.body,
         status: 'backlog',
         meta: task.meta,
+        ...(task.createdAt ? { sourceCreatedAt: new Date(task.createdAt) } : {}),
       });
       upserted += 1;
     }

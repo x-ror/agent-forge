@@ -67,6 +67,7 @@ export class GithubIssuesProvider implements TaskSourceProvider {
       html_url: string;
       labels: Array<{ name: string }>;
       pull_request?: unknown;
+      created_at?: string;
     }>;
 
     return issues
@@ -75,6 +76,7 @@ export class GithubIssuesProvider implements TaskSourceProvider {
         externalKey: `${parsed.owner}/${parsed.repo}#${issue.number}`,
         title: issue.title,
         body: issue.body ?? '',
+        ...(issue.created_at ? { createdAt: issue.created_at } : {}),
         meta: {
           url: issue.html_url,
           number: issue.number,

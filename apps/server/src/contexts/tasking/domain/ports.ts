@@ -7,6 +7,8 @@ export interface ExternalTask {
   title: string;
   body: string;
   meta: { [key: string]: Json };
+  /** ISO creation time at the source, when the source knows it. */
+  createdAt?: string;
 }
 
 export interface TaskSourceProviderContext {

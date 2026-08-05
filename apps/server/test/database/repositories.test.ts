@@ -182,7 +182,9 @@ describe('repository round-trips', () => {
     const task = await tasks.findById(id1);
     task!.status = 'in_flow';
     await tasks.save(task!);
-    // …then re-sync updates content but not status.
+    // …then re-sync updates content but not status; a source creation time
+    // corrects created_at so the board sorts in true source order.
+    const sourceCreatedAt = new Date('2026-01-15T10:00:00.000Z');
     const id2 = await tasks.upsertSynced({
       id: uuidv7(),
       projectId,
@@ -192,11 +194,27 @@ describe('repository round-trips', () => {
       body: 'b2',
       status: 'backlog',
       meta: { labels: ['bug'] },
+      sourceCreatedAt,
     });
     expect(id2).toBe(id1);
     const after = await tasks.findById(id1);
     expect(after?.title).toBe('updated title');
     expect(after?.status).toBe('in_flow');
+    expect(after?.createdAt.toISOString()).toBe(sourceCreatedAt.toISOString());
+
+    // A later sync without a source time leaves created_at alone.
+    await tasks.upsertSynced({
+      id: uuidv7(),
+      projectId,
+      sourceId,
+      externalKey: 'o/r#1',
+      title: 'updated title',
+      body: 'b2',
+      status: 'backlog',
+      meta: { labels: ['bug'] },
+    });
+    const afterPlain = await tasks.findById(id1);
+    expect(afterPlain?.createdAt.toISOString()).toBe(sourceCreatedAt.toISOString());
 
     const board = await tasks.listBoard(projectId, { status: 'in_flow' });
     expect(board.some((t) => t.id === id1)).toBe(true);

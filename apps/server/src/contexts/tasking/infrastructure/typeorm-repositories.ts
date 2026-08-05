@@ -66,15 +66,20 @@ export class TypeormTaskRepository implements TaskRepository {
    * Sync upsert on (source_id, external_key). Board lifecycle (status) is
    * owned locally, so re-sync refreshes content but never resets status.
    */
-  async upsertSynced(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id: string }): Promise<string> {
+  async upsertSynced(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id: string; sourceCreatedAt?: Date }): Promise<string> {
+    // created_at carries the source creation time when the provider knows it
+    // (GitHub issue created_at) — both on insert and as a correction on
+    // update, so boards sort in true source order; without one, insert time
+    // stands and updates leave it untouched.
     const rows: Array<{ id: string }> = await this.ds.query(
-      `INSERT INTO tasks (id, project_id, source_id, external_key, title, body, status, meta)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO tasks (id, project_id, source_id, external_key, title, body, status, meta, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::timestamptz, now()))
        ON CONFLICT (source_id, external_key)
        DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body,
-                     meta = EXCLUDED.meta, updated_at = now()
+                     meta = EXCLUDED.meta, updated_at = now(),
+                     created_at = COALESCE($9::timestamptz, tasks.created_at)
        RETURNING id`,
-      [task.id, task.projectId, task.sourceId, task.externalKey, task.title, task.body, task.status, JSON.stringify(task.meta)],
+      [task.id, task.projectId, task.sourceId, task.externalKey, task.title, task.body, task.status, JSON.stringify(task.meta), task.sourceCreatedAt ?? null],
     );
     return rows[0]!.id;
   }
