@@ -1,22 +1,4 @@
-import {
-  Button,
-  DataTable,
-  Dropdown,
-  Modal,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableToolbar,
-  TableToolbarContent,
-  TextArea,
-  TextInput,
-  Tile,
-} from '@carbon/react';
+import { Button, DataTable, Dropdown, Modal, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableHeader, TableRow, TextArea, TextInput, Tile } from '@carbon/react';
 import { Add, Play, Renew } from '@carbon/icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -26,7 +8,7 @@ import { useCreateTask, useStartFlow, useSyncTaskSource, useTaskBoard, useTaskSo
 import { useSse } from '../../api/sse';
 import { useAppState } from '../../state/app-state';
 import { StatusTag } from '../../components/StatusTag';
-import { formatDateTime } from '../../components/format';
+import { formatDateTime, sourceKindLabel } from '../../components/format';
 
 /** Source web page for the task (GitHub issue html_url); null for file/manual tasks. */
 function taskUrl(task: TaskDto): string | null {
@@ -165,19 +147,23 @@ export function TaskBoardPage() {
     <>
       <DataTable rows={rows} headers={HEADERS}>
         {({ rows: renderRows, headers, getHeaderProps, getRowProps, getTableProps }) => (
-          <TableContainer title="Task Board" description="Synced and manual tasks for this project">
-            <TableToolbar>
-              <TableToolbarContent>
+          <TableContainer>
+            <div className="af-page__header af-page__header--spread">
+              <div>
+                <h3 className="af-page__header-title">Task Board</h3>
+                <p className="af-page__header-desc">Synced and manual tasks for this project</p>
+              </div>
+              <div className="af-page__header-actions">
                 {(sources.data ?? []).map((source) => (
                   <Button key={source.id} kind="ghost" size="sm" renderIcon={Renew} onClick={() => syncSource.mutate(source.id)}>
-                    Sync {source.kind}
+                    Sync {sourceKindLabel(source.kind)}
                   </Button>
                 ))}
                 <Button kind="primary" size="sm" renderIcon={Add} onClick={() => setNewTask(true)}>
                   New task
                 </Button>
-              </TableToolbarContent>
-            </TableToolbar>
+              </div>
+            </div>
             <Table {...getTableProps()}>
               <TableHead>
                 <TableRow>

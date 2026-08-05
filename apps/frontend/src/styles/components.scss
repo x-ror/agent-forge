@@ -320,6 +320,26 @@
   justify-content: space-between;
 }
 
+.af-page__header-desc {
+  margin: 0.25rem 0 0;
+  color: var(--cds-text-secondary);
+  font-size: 0.875rem;
+}
+
+.af-page__header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Carbon positions trailing button icons at a fixed offset tuned for the
+   48px button — in sm (32px) buttons they sit visibly low. Center them. */
+.cds--btn--sm:not(.cds--btn--icon-only) .cds--btn__icon {
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+}
+
 /* ---- run detail ---- */
 .af-run-feed {
   padding: 0;

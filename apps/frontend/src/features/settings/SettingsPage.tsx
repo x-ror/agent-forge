@@ -25,7 +25,7 @@ import {
 import { TrashCan, View } from '@carbon/icons-react';
 import { useState } from 'react';
 import type { RepoAgentDto } from '@agentforge/core';
-import { formatDateTime } from '../../components/format';
+import { formatDateTime, sourceKindLabel } from '../../components/format';
 import { MarkdownView } from '../../components/MarkdownView';
 import {
   useAdapters,
@@ -301,7 +301,7 @@ function SourcesSection() {
         <StructuredListBody>
           {(sources.data ?? []).map((source) => (
             <StructuredListRow key={source.id}>
-              <StructuredListCell>{source.kind}</StructuredListCell>
+              <StructuredListCell>{sourceKindLabel(source.kind)}</StructuredListCell>
               <StructuredListCell className="af-cell--nowrap">{source.lastSyncedAt ? `synced ${formatDateTime(source.lastSyncedAt)}` : 'never synced'}</StructuredListCell>
             </StructuredListRow>
           ))}

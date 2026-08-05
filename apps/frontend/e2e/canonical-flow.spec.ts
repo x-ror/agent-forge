@@ -68,7 +68,7 @@ test('canonical flow is fully drivable from the UI', async ({ page, request }) =
 
   // ---- sync the board ------------------------------------------------------
   await page.getByRole('link', { name: 'Task Board' }).click();
-  await page.getByRole('button', { name: 'Sync file' }).click();
+  await page.getByRole('button', { name: 'Sync tracked file' }).click();
   await expect(page.getByText('Add greeting feature')).toBeVisible({ timeout: 30_000 });
 
   // ---- build the workflow on the canvas ------------------------------------
