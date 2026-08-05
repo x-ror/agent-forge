@@ -6,7 +6,15 @@ import { ScmService } from '../../scm/application/scm.service';
 import { TasksService } from '../../tasking/application/tasks.service';
 import { FlowRun } from '../domain/flow-run';
 import type { FlowStep } from '../domain/flow-step';
-import { FLOW_RUN_REPOSITORY, FLOW_STEP_REPOSITORY, WORKFLOW_REPOSITORY, type FlowRunRepository, type FlowStepRepository, type WorkflowRepository } from '../domain/repositories';
+import {
+  FLOW_RUN_REPOSITORY,
+  FLOW_STEP_REPOSITORY,
+  WORKFLOW_REPOSITORY,
+  type FlowRunListItem,
+  type FlowRunRepository,
+  type FlowStepRepository,
+  type WorkflowRepository,
+} from '../domain/repositories';
 import { ORCHESTRATION_TX, type OrchestrationTxPort } from '../domain/ports';
 
 @Injectable()
@@ -86,7 +94,7 @@ export class FlowRunsService {
     return { flowRun, steps: await this.steps.listByFlowRun(flowRunId) };
   }
 
-  async list(userId: string, limit: number, cursor?: string): Promise<FlowRun[]> {
+  async list(userId: string, limit: number, cursor?: string): Promise<FlowRunListItem[]> {
     const owned = await this.projects.list(userId);
     return this.flowRuns.list(
       owned.map((p) => p.id),

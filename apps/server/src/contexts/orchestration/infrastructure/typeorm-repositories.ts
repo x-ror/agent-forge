@@ -3,7 +3,7 @@ import { In, type DataSource } from 'typeorm';
 import { DATA_SOURCE } from '../../../database/database.module';
 import { FlowRun, type FlowContext } from '../domain/flow-run';
 import type { FlowStep, FlowStepDecision, FlowStepStatus } from '../domain/flow-step';
-import type { FlowRunRepository, FlowStepRepository, ScheduleRepository, WorkflowRepository } from '../domain/repositories';
+import type { FlowRunListItem, FlowRunRepository, FlowStepRepository, ScheduleRepository, WorkflowRepository } from '../domain/repositories';
 import type { Schedule, Workflow } from '../domain/workflow';
 import { FlowRunEntity, FlowStepEntity, ScheduleEntity, WorkflowEntity } from './entities';
 
@@ -67,18 +67,46 @@ export class TypeormFlowRunRepository implements FlowRunRepository {
     return rows.map((row) => FlowRun.restore({ ...row, context: row.context as FlowContext }));
   }
 
-  async list(projectIds: string[], limit: number, cursor?: string): Promise<FlowRun[]> {
+  async list(projectIds: string[], limit: number, cursor?: string): Promise<FlowRunListItem[]> {
     if (projectIds.length === 0) return [];
-    const qb = this.ds
-      .getRepository(FlowRunEntity)
-      .createQueryBuilder('f')
-      .innerJoin(WorkflowEntity, 'w', 'w.id = f.workflow_id')
-      .where('w.project_id IN (:...projectIds)', { projectIds })
-      .orderBy('f.id', 'DESC')
-      .limit(Math.min(limit, 200));
-    if (cursor) qb.andWhere('f.id < :cursor', { cursor });
-    const rows = await qb.getMany();
-    return rows.map((row) => FlowRun.restore({ ...row, context: row.context as FlowContext }));
+    // Raw joins on table names: tasks/projects belong to other contexts, and
+    // importing their entities here would couple the persistence layers.
+    const rows: Array<{
+      id: string;
+      workflow_id: string;
+      task_id: string;
+      status: string;
+      context: unknown;
+      started_at: Date;
+      finished_at: Date | null;
+      task_title: string;
+      workflow_name: string;
+      project_name: string;
+    }> = await this.ds.query(
+      `SELECT f.*, t.title AS task_title, w.name AS workflow_name, p.name AS project_name
+       FROM flow_runs f
+       JOIN workflows w ON w.id = f.workflow_id
+       JOIN tasks t ON t.id = f.task_id
+       JOIN projects p ON p.id = w.project_id
+       WHERE w.project_id = ANY($1::uuid[]) ${cursor ? 'AND f.id < $3' : ''}
+       ORDER BY f.id DESC
+       LIMIT $2`,
+      cursor ? [projectIds, Math.min(limit, 200), cursor] : [projectIds, Math.min(limit, 200)],
+    );
+    return rows.map((row) => ({
+      flowRun: FlowRun.restore({
+        id: row.id,
+        workflowId: row.workflow_id,
+        taskId: row.task_id,
+        status: row.status as FlowRun['status'],
+        context: row.context as FlowContext,
+        startedAt: row.started_at,
+        finishedAt: row.finished_at,
+      }),
+      taskTitle: row.task_title,
+      workflowName: row.workflow_name,
+      projectName: row.project_name,
+    }));
   }
 }
 

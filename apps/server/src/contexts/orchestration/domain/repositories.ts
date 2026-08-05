@@ -11,13 +11,20 @@ export interface WorkflowRepository {
   setEnabled(id: string, enabled: boolean): Promise<void>;
 }
 
+export interface FlowRunListItem {
+  flowRun: FlowRun;
+  taskTitle: string;
+  workflowName: string;
+  projectName: string;
+}
+
 export interface FlowRunRepository {
   insert(flowRun: FlowRun): Promise<void>;
   save(flowRun: FlowRun): Promise<void>;
   findById(id: string): Promise<FlowRun | null>;
   listActive(): Promise<FlowRun[]>;
   /** Newest-first, restricted to flows whose workflow belongs to one of the projects. */
-  list(projectIds: string[], limit: number, cursor?: string): Promise<FlowRun[]>;
+  list(projectIds: string[], limit: number, cursor?: string): Promise<FlowRunListItem[]>;
 }
 
 export interface FlowStepRepository {

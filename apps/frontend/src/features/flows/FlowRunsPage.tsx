@@ -34,7 +34,8 @@ export function FlowRunsPage() {
       <StructuredListWrapper>
         <StructuredListHead>
           <StructuredListRow head>
-            <StructuredListCell head>Flow</StructuredListCell>
+            <StructuredListCell head>Task</StructuredListCell>
+            <StructuredListCell head>Workflow</StructuredListCell>
             <StructuredListCell head>Status</StructuredListCell>
             <StructuredListCell head>Started</StructuredListCell>
             <StructuredListCell head>Finished</StructuredListCell>
@@ -44,7 +45,11 @@ export function FlowRunsPage() {
           {(flows.data ?? []).map((flow) => (
             <StructuredListRow key={flow.id}>
               <StructuredListCell>
-                <Link to={`/flow-runs/${flow.id}`}>{flow.id.slice(-12)}</Link>
+                <Link to={`/flow-runs/${flow.id}`}>{flow.taskTitle ?? flow.id.slice(-12)}</Link>
+              </StructuredListCell>
+              <StructuredListCell className="af-cell--nowrap">
+                {flow.workflowName ?? '—'}
+                {flow.projectName ? <span className="af-settings__muted"> · {flow.projectName}</span> : null}
               </StructuredListCell>
               <StructuredListCell>
                 <StatusTag status={flow.status} />

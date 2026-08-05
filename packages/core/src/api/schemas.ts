@@ -283,6 +283,10 @@ export const flowRunDtoSchema = z.object({
   startedAt: z.iso.datetime(),
   finishedAt: z.iso.datetime().nullable(),
   steps: z.array(flowStepDtoSchema).optional(),
+  /** List enrichment — present on GET /flow-runs only. */
+  taskTitle: z.string().optional(),
+  workflowName: z.string().optional(),
+  projectName: z.string().optional(),
 });
 export type FlowRunDto = z.infer<typeof flowRunDtoSchema>;
 
