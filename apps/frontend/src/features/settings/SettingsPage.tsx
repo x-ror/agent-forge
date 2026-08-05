@@ -71,6 +71,53 @@ function ModelPicker({ id, value, onChange }: { id: string; value: string; onCha
   );
 }
 
+/** claude-code permission levels — stored as --permission-mode in options.extraArgs. */
+type PermissionLevel = '' | 'acceptEdits' | 'bypassPermissions';
+
+function permissionLevelOf(optionsJson: string): PermissionLevel {
+  try {
+    const opts = optionsJson.trim() ? (JSON.parse(optionsJson) as { extraArgs?: unknown }) : {};
+    const args = Array.isArray(opts.extraArgs) ? opts.extraArgs.map(String) : [];
+    const i = args.indexOf('--permission-mode');
+    const mode = i >= 0 ? args[i + 1] : undefined;
+    return mode === 'acceptEdits' || mode === 'bypassPermissions' ? mode : '';
+  } catch {
+    return '';
+  }
+}
+
+function withPermissionLevel(optionsJson: string, level: PermissionLevel): string {
+  let opts: Record<string, unknown> = {};
+  try {
+    opts = optionsJson.trim() ? (JSON.parse(optionsJson) as Record<string, unknown>) : {};
+  } catch {
+    opts = {};
+  }
+  const args = (Array.isArray(opts.extraArgs) ? opts.extraArgs : []).map(String);
+  const i = args.indexOf('--permission-mode');
+  if (i >= 0) args.splice(i, 2);
+  if (level) args.push('--permission-mode', level);
+  if (args.length > 0) opts.extraArgs = args;
+  else delete opts.extraArgs;
+  return Object.keys(opts).length > 0 ? JSON.stringify(opts) : '';
+}
+
+function PermissionSelect({ id, optionsJson, onChange }: { id: string; optionsJson: string; onChange: (next: string) => void }) {
+  return (
+    <Select
+      id={id}
+      labelText="Permissions (claude-code)"
+      helperText="What the agent may do headlessly — human checkpoints stay at workflow gates."
+      value={permissionLevelOf(optionsJson)}
+      onChange={(e) => onChange(withPermissionLevel(optionsJson, e.target.value as PermissionLevel))}
+    >
+      <SelectItem value="" text="Read-only — denies all writes (planners, analysts)" />
+      <SelectItem value="acceptEdits" text="Edit files — recommended for implementers/fixers" />
+      <SelectItem value="bypassPermissions" text="Full autonomy — trusted repos only" />
+    </Select>
+  );
+}
+
 function EditProjectModal({ project, onClose }: { project: ProjectDto; onClose: () => void }) {
   const updateProject = useUpdateProject();
   const [name, setName] = useState(project.name);
@@ -249,6 +296,7 @@ function EditAgentModal({ agent, onClose }: { agent: AgentDto; onClose: () => vo
             <SelectItem key={item.id} value={item.id} text={item.id} />
           ))}
         </Select>
+        {adapter === 'claude-code' && <PermissionSelect id="edit-agent-permissions" optionsJson={optionsJson} onChange={setOptionsJson} />}
         <ModelPicker id="edit-agent-model" value={model} onChange={setModel} />
         <TextInput id="edit-agent-options" labelText="Adapter options JSON (optional)" value={optionsJson} onChange={(e) => setOptionsJson(e.target.value)} />
         {specialists.length > 0 && <p className="af-settings__tab-desc">Attached specialists: {specialists.join(', ')} — their briefs live inside the system prompt below.</p>}
@@ -401,6 +449,7 @@ function AgentsSection() {
               <SelectItem key={item.id} value={item.id} text={item.id} />
             ))}
           </Select>
+          {adapter === 'claude-code' && <PermissionSelect id="agent-permissions" optionsJson={optionsJson} onChange={setOptionsJson} />}
           <ModelPicker id="agent-model" value={model} onChange={setModel} />
           <TextInput
             id="agent-options"
