@@ -168,14 +168,8 @@ export function RunDetailPage() {
             )}
           </div>
           <p className="af-page__header-desc">
-            started {formatDateTime(run.data.startedAt ?? run.data.createdAt)}
-            {duration && <> · took {duration}</>}
-            {typeof usage.tokensIn === 'number' && (
-              <>
-                {' '}
-                · {usage.tokensIn.toLocaleString()} in / {(usage.tokensOut ?? 0).toLocaleString()} out
-              </>
-            )}
+            {formatDateTime(run.data.startedAt ?? run.data.createdAt)}
+            {duration && <> · {duration}</>}
             {typeof usage.costUsd === 'number' && usage.costUsd > 0 && <> · ${usage.costUsd.toFixed(2)}</>}
           </p>
         </div>

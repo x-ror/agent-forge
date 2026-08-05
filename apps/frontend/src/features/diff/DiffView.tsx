@@ -7,7 +7,7 @@ import { useAppState } from '../../state/app-state';
 interface DiffFileSection {
   path: string;
   lang: string;
-  /** The file's portion of the unified diff, from its first @@ hunk header. */
+  /** The file's complete unified diff section, headers included. */
   hunks: string;
   additions: number;
   deletions: number;
@@ -32,7 +32,9 @@ export function splitDiff(diff: string): DiffFileSection[] {
     sections.push({
       path,
       lang: path.split('.').at(-1) ?? 'txt',
-      hunks: part.slice(hunkStart),
+      // The parser needs the full per-file diff (diff --git/---/+++ headers
+      // included) — hunk-only input parses to an empty view.
+      hunks: `diff --git ${part}`,
       additions,
       deletions,
     });
