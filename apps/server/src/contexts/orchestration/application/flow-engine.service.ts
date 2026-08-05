@@ -70,8 +70,12 @@ export class FlowEngine {
     }
     // Policy: agents try once. `failed` blocks re-entry until the user hits
     // Resume (which marks those steps skipped). Never auto-retry agents.
+    // `cancelled` blocks too: a user-stopped run must not restart from the
+    // still-satisfied incoming edge — settle() ends the flow instead.
     const started = new Set(
-      state.steps.filter((s) => s.status === 'succeeded' || s.status === 'running' || s.status === 'awaiting_input' || s.status === 'failed').map((s) => s.nodeId),
+      state.steps
+        .filter((s) => s.status === 'succeeded' || s.status === 'running' || s.status === 'awaiting_input' || s.status === 'failed' || s.status === 'cancelled')
+        .map((s) => s.nodeId),
     );
 
     // Resolve edges to a fixpoint: immediately-completing steps (triggers,

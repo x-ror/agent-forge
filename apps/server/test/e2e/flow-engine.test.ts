@@ -358,6 +358,47 @@ describe('Phase 8 e2e: the workflow engine', () => {
     expect(failDetail.context.steps?.quality?.output).toContain('lint error: broken');
   });
 
+  it('cancelling an agent run does NOT restart it — the flow ends cancelled', async () => {
+    const wf = await http.post('/workflows', {
+      projectId,
+      name: 'cancel-no-restart',
+      definition: {
+        nodes: [
+          { id: 'start', type: 'trigger.task_selected' },
+          { id: 'implement', type: 'action.agent', agent: 'Hanger', prompt: 'work on {{task.title}}' },
+          { id: 'note', type: 'action.notify', channel: 'log' },
+        ],
+        edges: [
+          { from: 'start', to: 'implement', on: 'succeeded' },
+          { from: 'implement', to: 'note', on: 'succeeded' },
+        ],
+      },
+    });
+    expect(wf.status).toBe(201);
+    const taskId = await makeTask('Stop me');
+    const started = await http.post('/flow-runs', { workflowId: (wf.body as { id: string }).id, taskId });
+    const flowRunId = (started.body as { id: string }).id;
+
+    // Wait for the implement run to exist and be running, then cancel it.
+    let runId: string | null = null;
+    for (let i = 0; i < 90 && !runId; i += 1) {
+      const detail = (await http.get(`/flow-runs/${flowRunId}`)).body as { steps?: Array<{ nodeId: string; status: string; runId: string | null }> };
+      const step = detail.steps?.find((s) => s.nodeId === 'implement');
+      if (step?.runId && step.status === 'running') runId = step.runId;
+      else await new Promise((r) => setTimeout(r, 500));
+    }
+    expect(runId).not.toBeNull();
+    const cancel = await http.post(`/runs/${runId}/inputs`, { kind: 'cancel' });
+    expect(cancel.status).toBe(201);
+
+    // The user-stopped run must not respawn: flow settles cancelled with
+    // exactly one implement attempt, and the task returns to backlog.
+    expect(await waitFlow(flowRunId, ['cancelled', 'failed', 'succeeded'])).toBe('cancelled');
+    const detail = (await http.get(`/flow-runs/${flowRunId}`)).body as { steps: Array<{ nodeId: string; runId: string | null }> };
+    expect(detail.steps.filter((s) => s.nodeId === 'implement')).toHaveLength(1);
+    expect(((await http.get(`/tasks/${taskId}`)).body as { status: string }).status).toBe('backlog');
+  });
+
   it('gate rejection fails the flow honestly', async () => {
     const wf = await http.post('/workflows', {
       projectId,
