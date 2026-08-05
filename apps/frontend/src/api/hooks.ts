@@ -335,6 +335,22 @@ export function useRunDiff(id: string | null, enabled: boolean) {
   });
 }
 
+export interface UsageDay {
+  day: string;
+  runs: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+}
+
+export function useUsageSummary(projectId: string | null, days = 30) {
+  return useQuery({
+    queryKey: ['usage', projectId, days],
+    enabled: !!projectId,
+    queryFn: () => api.get<{ days: UsageDay[] }>(`/runs/usage/summary?projectId=${projectId}&days=${days}`),
+  });
+}
+
 export type { RunEventDto, PatDto };
 
 export function usePats() {

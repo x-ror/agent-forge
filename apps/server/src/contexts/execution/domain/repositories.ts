@@ -7,6 +7,16 @@ export interface RunRepository {
   findById(id: string): Promise<Run | null>;
   /** Active runs whose lease_at is older than the given cutoff (§5.4 recovery). */
   findStaleActive(cutoff: Date): Promise<Run[]>;
+  /** Per-day usage/cost aggregates for a project's runs (newest day first). */
+  usageSummary(projectId: string, days: number): Promise<UsageDay[]>;
+}
+
+export interface UsageDay {
+  day: string;
+  runs: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
 }
 
 export interface RunEventRepository {

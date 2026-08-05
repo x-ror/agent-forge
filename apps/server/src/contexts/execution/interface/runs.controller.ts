@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Post, Query, Req, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, Param, Post, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createRunRequestSchema, runInputRequestSchema, type CreateRunRequest, type RunDto, type RunEventDto, type RunInputRequest } from '@agentforge/core';
 import { CurrentUser, type AuthUser } from '../../../shared/http/auth.decorators';
@@ -49,6 +49,17 @@ export class RunsController {
     @Inject(RUN_EVENT_REPOSITORY) private readonly events: RunEventRepository,
     @Inject(ARTIFACT_REPOSITORY) private readonly artifacts: ArtifactRepository,
   ) {}
+
+  /** Per-day usage/cost aggregates. Static path — declared before :id routes. */
+  @Get('usage/summary')
+  async usageSummary(
+    @CurrentUser() user: AuthUser,
+    @Query('projectId') projectId: string,
+    @Query('days') days?: string,
+  ): Promise<{ days: Awaited<ReturnType<RunsService['usageSummary']>> }> {
+    if (!projectId) throw new BadRequestException('projectId query param required');
+    return { days: await this.runs.usageSummary(user.userId, projectId, days ? Number(days) : 30) };
+  }
 
   @Post()
   async create(@CurrentUser() user: AuthUser, @Body(new ZodValidationPipe(createRunRequestSchema)) body: CreateRunRequest): Promise<RunDto> {

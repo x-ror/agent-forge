@@ -13,6 +13,7 @@ import {
   Stack,
   StructuredListBody,
   StructuredListCell,
+  StructuredListHead,
   StructuredListRow,
   StructuredListWrapper,
   Tab,
@@ -49,6 +50,7 @@ import {
   useTaskSources,
   useUpdateAgent,
   useUpdateProject,
+  useUsageSummary,
 } from '../../api/hooks';
 import { useAppState } from '../../state/app-state';
 
@@ -562,6 +564,64 @@ function SecretsSection() {
   );
 }
 
+function UsageSection() {
+  const { projectId } = useAppState();
+  const usage = useUsageSummary(projectId);
+  if (!projectId) return <p>Select a project first.</p>;
+  if (usage.isLoading) return <InlineLoading description="Loading usage…" />;
+  const rows = usage.data?.days ?? [];
+  if (rows.length === 0) return <p className="af-empty-state">No agent runs in the last 30 days.</p>;
+  const total = rows.reduce(
+    (acc, d) => ({ runs: acc.runs + d.runs, tokensIn: acc.tokensIn + d.tokensIn, tokensOut: acc.tokensOut + d.tokensOut, costUsd: acc.costUsd + d.costUsd }),
+    {
+      runs: 0,
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsd: 0,
+    },
+  );
+  return (
+    <StructuredListWrapper>
+      <StructuredListHead>
+        <StructuredListRow head>
+          <StructuredListCell head>Day</StructuredListCell>
+          <StructuredListCell head>Runs</StructuredListCell>
+          <StructuredListCell head>Tokens in / out</StructuredListCell>
+          <StructuredListCell head>Cost</StructuredListCell>
+        </StructuredListRow>
+      </StructuredListHead>
+      <StructuredListBody>
+        {rows.map((d) => (
+          <StructuredListRow key={d.day}>
+            <StructuredListCell className="af-cell--nowrap">{d.day}</StructuredListCell>
+            <StructuredListCell>{d.runs}</StructuredListCell>
+            <StructuredListCell className="af-cell--nowrap">
+              {d.tokensIn.toLocaleString()} / {d.tokensOut.toLocaleString()}
+            </StructuredListCell>
+            <StructuredListCell className="af-cell--nowrap">${d.costUsd.toFixed(2)}</StructuredListCell>
+          </StructuredListRow>
+        ))}
+        <StructuredListRow>
+          <StructuredListCell>
+            <strong>Total (30 days)</strong>
+          </StructuredListCell>
+          <StructuredListCell>
+            <strong>{total.runs}</strong>
+          </StructuredListCell>
+          <StructuredListCell className="af-cell--nowrap">
+            <strong>
+              {total.tokensIn.toLocaleString()} / {total.tokensOut.toLocaleString()}
+            </strong>
+          </StructuredListCell>
+          <StructuredListCell className="af-cell--nowrap">
+            <strong>${total.costUsd.toFixed(2)}</strong>
+          </StructuredListCell>
+        </StructuredListRow>
+      </StructuredListBody>
+    </StructuredListWrapper>
+  );
+}
+
 function RepoAgentsSection() {
   const { projectId } = useAppState();
   const catalog = useRepoAgents(projectId);
@@ -878,6 +938,9 @@ export function SettingsPage() {
               </AccordionItem>
               <AccordionItem title="Repo agents (from registry)">
                 <RepoAgentsSection />
+              </AccordionItem>
+              <AccordionItem title="Usage & cost">
+                <UsageSection />
               </AccordionItem>
             </Accordion>
           </TabPanel>

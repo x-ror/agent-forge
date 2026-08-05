@@ -6,7 +6,7 @@ import { AGENT_REPOSITORY, type AgentRepository } from '../../agent-registry/dom
 import { ProjectsService } from '../../projects/application/projects.service';
 import { Run } from '../domain/run';
 import type { RunEvent, RunInput } from '../domain/run-event';
-import { RUN_EVENT_REPOSITORY, RUN_REPOSITORY, type RunEventRepository, type RunRepository } from '../domain/repositories';
+import { RUN_EVENT_REPOSITORY, RUN_REPOSITORY, type RunEventRepository, type RunRepository, type UsageDay } from '../domain/repositories';
 import { RUN_TX, type RunTxPort } from '../domain/ports';
 
 @Injectable()
@@ -34,6 +34,11 @@ export class RunsService {
     // State + run.requested event commit atomically; the dispatcher enqueues.
     await this.tx.insertRun(run, [{ aggregateType: 'run', aggregateId: run.id, eventType: EventTypes.RunRequested, payload: {} }]);
     return run;
+  }
+
+  async usageSummary(userId: string, projectId: string, days: number): Promise<UsageDay[]> {
+    await this.projects.getOwned(userId, projectId);
+    return this.runs.usageSummary(projectId, Math.min(Math.max(days, 1), 90));
   }
 
   async getAccessible(userId: string, runId: string): Promise<Run> {

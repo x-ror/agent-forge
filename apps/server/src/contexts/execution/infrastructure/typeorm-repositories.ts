@@ -5,7 +5,7 @@ import { DATA_SOURCE } from '../../../database/database.module';
 import { toRow, toRows } from '../../../database/row';
 import { Run, type RunStatus } from '../domain/run';
 import type { Artifact, RunEvent, RunInput } from '../domain/run-event';
-import type { ArtifactRepository, RunEventRepository, RunInputRepository, RunRepository } from '../domain/repositories';
+import type { ArtifactRepository, RunEventRepository, RunInputRepository, RunRepository, UsageDay } from '../domain/repositories';
 import { ArtifactEntity, RunEntity, RunEventEntity, RunInputEntity } from './entities';
 
 const RECOVERABLE_STATUSES: RunStatus[] = ['provisioning', 'running', 'awaiting_input', 'finalizing'];
@@ -22,6 +22,28 @@ function toDomain(entity: RunEntity): Run {
 @Injectable()
 export class TypeormRunRepository implements RunRepository {
   constructor(@Inject(DATA_SOURCE) private readonly ds: DataSource) {}
+
+  async usageSummary(projectId: string, days: number): Promise<UsageDay[]> {
+    const rows: Array<{ day: string; runs: string; tokens_in: string; tokens_out: string; cost_usd: string }> = await this.ds.query(
+      `SELECT date_trunc('day', created_at)::date::text AS day,
+              count(*)::text AS runs,
+              COALESCE(SUM((usage->>'tokensIn')::bigint), 0)::text AS tokens_in,
+              COALESCE(SUM((usage->>'tokensOut')::bigint), 0)::text AS tokens_out,
+              COALESCE(SUM((usage->>'costUsd')::numeric), 0)::text AS cost_usd
+       FROM runs
+       WHERE project_id = $1 AND created_at > now() - make_interval(days => $2)
+       GROUP BY 1
+       ORDER BY 1 DESC`,
+      [projectId, days],
+    );
+    return rows.map((r) => ({
+      day: r.day,
+      runs: Number(r.runs),
+      tokensIn: Number(r.tokens_in),
+      tokensOut: Number(r.tokens_out),
+      costUsd: Number(r.cost_usd),
+    }));
+  }
 
   async insert(run: Run): Promise<void> {
     await this.ds.getRepository(RunEntity).insert(toRow<RunEntity>(run.snapshot()));
