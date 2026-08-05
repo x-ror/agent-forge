@@ -120,7 +120,7 @@ test('canonical flow is fully drivable from the UI', async ({ page, request }) =
 
   // ---- see the diff --------------------------------------------------------
   await page.getByRole('tab', { name: 'Diff' }).click();
-  await expect(page.getByText('greeting.txt').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('diff-file-greeting.txt')).toBeVisible({ timeout: 15_000 }); // step bodies also mention the filename in the hidden Timeline tab
 
   // ---- task followed the flow to done --------------------------------------
   await page.getByRole('link', { name: 'Task Board' }).click();
