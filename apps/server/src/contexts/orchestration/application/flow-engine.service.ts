@@ -344,6 +344,7 @@ export class FlowEngine {
         runId: lastAgentStep?.runId ?? null,
         title: renderTemplate(node && 'title' in node && node.title ? node.title : 'AgentForge: {{task.title}}', state.flow.context),
         taskTitle: state.task.title,
+        taskExternalKey: state.task.externalKey,
       };
     });
     if (!setup) return;
@@ -359,7 +360,11 @@ export class FlowEngine {
       branch: setup.worktree.branch,
       baseRef: setup.worktree.baseRef,
       title: setup.title,
-      body: `Automated by AgentForge for task: ${setup.taskTitle}`,
+      // `Closes #N` auto-closes the source issue on merge when the task came
+      // from this repo's issues (externalKey `owner/repo#N`).
+      body: [`Automated by AgentForge for task: ${setup.taskTitle}`, ...(/#(\d+)$/.exec(setup.taskExternalKey ?? '') ? [`Closes #${/#(\d+)$/.exec(setup.taskExternalKey ?? '')![1]}`] : [])].join(
+        '\n\n',
+      ),
     });
     await this.otx.withFlowTick(flowRunId, async (ops) => {
       await ops.mergeFlowContext({
