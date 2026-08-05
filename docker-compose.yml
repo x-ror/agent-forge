@@ -65,6 +65,8 @@ services:
   worker:
     restart: unless-stopped
     image: agentforge/server:latest
+    extra_hosts:
+      - 'host.docker.internal:host-gateway' # local LLMs (Ollama) on the host
     build:
       context: .
       dockerfile: apps/server/Dockerfile
