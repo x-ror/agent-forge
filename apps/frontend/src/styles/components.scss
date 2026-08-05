@@ -88,7 +88,9 @@
   text-decoration: underline;
 }
 
-.af-task-expanded td {
+/* Direct child only — the nested table's own tds manage their padding below.
+   (!important: Carbon's .cds--data-table td padding also matches in here.) */
+.af-task-expanded > td {
   padding: 0 !important;
   background: var(--cds-layer-01);
 }
@@ -104,18 +106,19 @@
 }
 
 .af-task-nested__row td {
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 1rem !important;
   border-top: 1px solid var(--cds-border-subtle-01);
   vertical-align: middle;
   font-size: 0.875rem;
 }
 
-.af-task-nested__title {
-  width: 36%;
-  /* The nested table spans the full row, including under the parent's
-     expand-arrow column (2.5rem) — pad past it so children start visibly
-     to the right of the epic title (which sits at 2.5rem + 1rem). */
-  padding-left: 3.5rem !important;
+.af-task-nested__row td.af-task-nested__title {
+  /* Roughly align the nested status column with the parent table's, and
+     start child titles clearly to the right of root-row titles: the nested
+     table spans the full row, including under the parent's expand-arrow
+     column (2.5rem), so pad well past it. */
+  width: 45%;
+  padding-left: 5rem !important;
 }
 
 .af-task-nested__indent {

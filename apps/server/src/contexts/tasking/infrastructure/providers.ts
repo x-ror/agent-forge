@@ -78,6 +78,45 @@ export function parseFileTasksMarkdown(content: string, filePath: string): Exter
   return tasks;
 }
 
+/** GitHub task-list references in an issue body: `- [ ] #80 …` / `- [x] #80 …`. */
+function bodyTaskRefs(body: string): Array<{ number: number; checked: boolean }> {
+  const refs: Array<{ number: number; checked: boolean }> = [];
+  for (const raw of body.split('\n')) {
+    const match = /^\s*[-*]\s*\[([ xX])\]\s*[^#\n]*#(\d+)/.exec(raw);
+    if (match) refs.push({ number: Number(match[2]), checked: match[1] !== ' ' });
+  }
+  return refs;
+}
+
+/**
+ * Labeled-epic fallback: repos that don't use GitHub's native sub-issues often
+ * keep a task-list of issue refs in the epic body. Derive child links
+ * (meta.parentExternalKey) and progress (meta.subIssues from the checkboxes —
+ * checked refs count as done even though closed issues are never synced).
+ * Native sub-issue data wins when present; an epic is never linked as another
+ * epic's child (the board tree is one level, so it would orphan its own
+ * children); the first epic to reference an issue keeps it.
+ */
+export function linkEpicsByBodyTaskLists(tasks: ExternalTask[]): void {
+  const byNumber = new Map<number, ExternalTask>();
+  for (const t of tasks) {
+    if (typeof t.meta.number === 'number') byNumber.set(t.meta.number, t);
+  }
+  for (const epic of tasks) {
+    if (epic.meta.role !== 'epic') continue;
+    const native = epic.meta.subIssues as { total?: number } | undefined;
+    if ((native?.total ?? 0) > 0) continue;
+    const refs = bodyTaskRefs(epic.body);
+    if (refs.length === 0) continue;
+    epic.meta.subIssues = { total: refs.length, completed: refs.filter((r) => r.checked).length };
+    for (const ref of refs) {
+      const child = byNumber.get(ref.number);
+      if (!child || child === epic || child.meta.role === 'epic') continue;
+      if (child.meta.parentExternalKey === undefined) child.meta.parentExternalKey = epic.externalKey;
+    }
+  }
+}
+
 /** GitHub Issues → tasks. Config: { repo?: 'owner/name', labels?: string[] }. */
 @Injectable()
 export class GithubIssuesProvider implements TaskSourceProvider {
@@ -115,7 +154,7 @@ export class GithubIssuesProvider implements TaskSourceProvider {
       sub_issues_summary?: { total?: number; completed?: number; percent_completed?: number } | null;
     }>;
 
-    return issues
+    const externalTasks = issues
       .filter((issue) => !issue.pull_request) // the issues API also returns PRs
       .map((issue) => {
         const labels = issue.labels.map((l) => l.name);
@@ -143,6 +182,8 @@ export class GithubIssuesProvider implements TaskSourceProvider {
           meta,
         };
       });
+    linkEpicsByBodyTaskLists(externalTasks);
+    return externalTasks;
   }
 }
 

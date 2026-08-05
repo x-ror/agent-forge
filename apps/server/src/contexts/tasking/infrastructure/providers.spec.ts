@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parentNumberFromUrl, parseFileTasksMarkdown } from './providers';
+import type { ExternalTask } from '../domain/ports';
+import { linkEpicsByBodyTaskLists, parentNumberFromUrl, parseFileTasksMarkdown } from './providers';
 
 describe('parseFileTasksMarkdown', () => {
   it('keeps a plain checklist flat regardless of doc headings', () => {
@@ -61,6 +62,59 @@ describe('parseFileTasksMarkdown', () => {
     expect(tasks[0]!.meta.role).toBeUndefined();
     expect(tasks[0]!.meta.parentExternalKey).toBeUndefined();
     expect(tasks[0]!.externalKey).toBe('file:TASKS.md:only-item');
+  });
+});
+
+describe('linkEpicsByBodyTaskLists', () => {
+  const issue = (number: number, extra: Partial<ExternalTask> & { meta?: ExternalTask['meta'] } = {}): ExternalTask => ({
+    externalKey: `acme/widget#${number}`,
+    title: `Issue ${number}`,
+    body: '',
+    ...extra,
+    meta: { number, ...extra.meta },
+  });
+
+  it('links body task-list refs as children and derives progress from checkboxes', () => {
+    const epic = issue(1, {
+      body: ['Umbrella tracker.', '', '### Sub-issues', '', '- [ ] #2 — net sockets', '- [x] #99 — already closed, not synced', '- [ ] #3'].join('\n'),
+      meta: { number: 1, role: 'epic', subIssues: { total: 0, completed: 0 } },
+    });
+    const childA = issue(2);
+    const childB = issue(3);
+    const tasks = [epic, childA, childB];
+    linkEpicsByBodyTaskLists(tasks);
+
+    expect(childA.meta.parentExternalKey).toBe('acme/widget#1');
+    expect(childB.meta.parentExternalKey).toBe('acme/widget#1');
+    // 3 refs, 1 checked — the closed #99 still counts toward progress.
+    expect(epic.meta.subIssues).toEqual({ total: 3, completed: 1 });
+  });
+
+  it('never links an epic as another epic’s child and keeps first-claim wins', () => {
+    const index = issue(10, { body: '- [ ] #11\n- [ ] #12', meta: { number: 10, role: 'epic' } });
+    const nestedEpic = issue(11, { body: '- [ ] #12', meta: { number: 11, role: 'epic' } });
+    const child = issue(12);
+    linkEpicsByBodyTaskLists([index, nestedEpic, child]);
+
+    expect(nestedEpic.meta.parentExternalKey).toBeUndefined();
+    expect(child.meta.parentExternalKey).toBe('acme/widget#10'); // index claimed it first
+  });
+
+  it('leaves epics with native sub-issue data alone', () => {
+    const epic = issue(1, { body: '- [ ] #2', meta: { number: 1, role: 'epic', subIssues: { total: 4, completed: 2 } } });
+    const child = issue(2);
+    linkEpicsByBodyTaskLists([epic, child]);
+
+    expect(epic.meta.subIssues).toEqual({ total: 4, completed: 2 });
+    expect(child.meta.parentExternalKey).toBeUndefined();
+  });
+
+  it('respects native parent links over body refs', () => {
+    const epic = issue(1, { body: '- [ ] #2', meta: { number: 1, role: 'epic' } });
+    const child = issue(2, { meta: { number: 2, parentExternalKey: 'acme/widget#7' } });
+    linkEpicsByBodyTaskLists([epic, child]);
+
+    expect(child.meta.parentExternalKey).toBe('acme/widget#7');
   });
 });
 
