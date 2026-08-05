@@ -1,4 +1,4 @@
-import { ActionableNotification, Button, CodeSnippet, InlineLoading, InlineNotification, Tab, TabList, TabPanel, TabPanels, Tabs, TextInput, Tile } from '@carbon/react';
+import { ActionableNotification, Button, InlineLoading, InlineNotification, Tab, TabList, TabPanel, TabPanels, Tabs, TextInput, Tile } from '@carbon/react';
 import { Send, StopFilled } from '@carbon/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useQueryClient } from '@tanstack/react-query';
@@ -154,10 +154,19 @@ export function RunDetailPage() {
   const duration = formatDuration(run.data.startedAt ?? run.data.createdAt, run.data.finishedAt);
 
   return (
-    <div>
+    <div className="af-run-page">
       <div className="af-page__header">
         <div>
-          <h3 className="af-page__header-title">Run {run.data.id.slice(-8)}</h3>
+          <div className="af-page__title-row">
+            <h3 className="af-page__header-title">Run {run.data.id.slice(-8)}</h3>
+            <StatusTag status={run.data.status} />
+            {run.data.branch && <code className="af-branch-chip">{run.data.branch}</code>}
+            {!terminal && (
+              <Button kind="danger--ghost" size="sm" renderIcon={StopFilled} onClick={() => runInput.mutate({ kind: 'cancel' })}>
+                Cancel run
+              </Button>
+            )}
+          </div>
           <p className="af-page__header-desc">
             started {formatDateTime(run.data.startedAt ?? run.data.createdAt)}
             {duration && <> · took {duration}</>}
@@ -170,17 +179,6 @@ export function RunDetailPage() {
             {typeof usage.costUsd === 'number' && usage.costUsd > 0 && <> · ${usage.costUsd.toFixed(2)}</>}
           </p>
         </div>
-        <StatusTag status={run.data.status} />
-        {run.data.branch && (
-          <CodeSnippet type="single" hideCopyButton>
-            {run.data.branch}
-          </CodeSnippet>
-        )}
-        {!terminal && (
-          <Button kind="danger--ghost" size="sm" renderIcon={StopFilled} onClick={() => runInput.mutate({ kind: 'cancel' })}>
-            Cancel run
-          </Button>
-        )}
       </div>
 
       {run.data.error && <InlineNotification kind="error" lowContrast hideCloseButton title="Run failed" subtitle={run.data.error} />}

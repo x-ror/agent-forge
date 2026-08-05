@@ -333,6 +333,23 @@
   gap: 0.5rem;
 }
 
+/* Title + status/branch/actions on one baseline; subtitle sits below. */
+.af-page__title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.af-branch-chip {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--cds-layer-01);
+  border: 1px solid var(--cds-border-subtle);
+  border-radius: 0.25rem;
+}
+
 /* Carbon absolutely-positions trailing button icons at a fixed offset tuned
    for the 48px button — in sm (32px) buttons they sit visibly low. Center
    them. Ghost buttons are excluded: their icons are static flex children and
@@ -343,6 +360,43 @@
 }
 
 /* ---- run detail ---- */
+/* Viewport-fit page: header and tabs take their space, the feed takes the
+   rest and is the ONLY thing that scrolls — no page + feed double scrollbar.
+   7rem = 3rem app header + 2rem Content padding top and bottom. */
+.af-run-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 7rem);
+  min-height: 24rem;
+}
+
+.af-run-page > .cds--tab-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 0 0; /* flush with the tabs — Carbon's 1rem inset read as misalignment */
+  overflow: auto; /* the Diff tab scrolls here; the Events tab fits exactly */
+}
+
+/* display:flex above would defeat the hidden attribute on inactive panels. */
+.af-run-page > .cds--tab-content[hidden] {
+  display: none;
+}
+
+.af-run-page .af-run-feed {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.af-run-page .af-run-feed__scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
 .af-page__hint {
   margin: -0.5rem 0 1rem;
   color: var(--cds-text-secondary);

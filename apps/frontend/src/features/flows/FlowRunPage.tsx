@@ -109,45 +109,49 @@ export function FlowRunPage() {
 
   return (
     <div>
-      <div className="af-page__header">
+      <div className="af-page__header af-page__header--spread">
         <div>
-          <h3 className="af-page__header-title">{taskTitle ?? `Flow ${flow.data.id.slice(-8)}`}</h3>
+          <div className="af-page__title-row">
+            <h3 className="af-page__header-title">{taskTitle ?? `Flow ${flow.data.id.slice(-8)}`}</h3>
+            <StatusTag status={flow.data.status} />
+          </div>
           <p className="af-page__header-desc">
             Flow {flow.data.id.slice(-8)} · started {formatDateTime(flow.data.startedAt)}
             {duration && <> · took {duration}</>}
           </p>
         </div>
-        <StatusTag status={flow.data.status} />
-        {awaitingGate && (
-          <Button kind="primary" size="sm" onClick={() => setGateOpen(true)} data-testid="open-gate">
-            Review gate
-          </Button>
-        )}
-        {flow.data.status === 'failed' && (
-          <Button
-            kind="primary"
-            size="sm"
-            renderIcon={Renew}
-            disabled={resumeFlow.isPending || abandonFlow.isPending}
-            onClick={() => resumeFlow.mutate()}
-            data-testid="resume-flow"
-            title="One retry of failed steps only; press again after another failure"
-          >
-            {resumeFlow.isPending ? 'Retrying…' : 'Retry once'}
-          </Button>
-        )}
-        {canAbandon && (
-          <Button
-            kind="danger"
-            size="sm"
-            renderIcon={TrashCan}
-            disabled={abandonFlow.isPending || resumeFlow.isPending}
-            onClick={() => setAbandonOpen(true)}
-            data-testid="abandon-flow"
-          >
-            Discard session
-          </Button>
-        )}
+        <div className="af-page__header-actions">
+          {awaitingGate && (
+            <Button kind="primary" size="sm" onClick={() => setGateOpen(true)} data-testid="open-gate">
+              Review gate
+            </Button>
+          )}
+          {flow.data.status === 'failed' && (
+            <Button
+              kind="primary"
+              size="sm"
+              renderIcon={Renew}
+              disabled={resumeFlow.isPending || abandonFlow.isPending}
+              onClick={() => resumeFlow.mutate()}
+              data-testid="resume-flow"
+              title="One retry of failed steps only; press again after another failure"
+            >
+              {resumeFlow.isPending ? 'Retrying…' : 'Retry once'}
+            </Button>
+          )}
+          {canAbandon && (
+            <Button
+              kind="danger"
+              size="sm"
+              renderIcon={TrashCan}
+              disabled={abandonFlow.isPending || resumeFlow.isPending}
+              onClick={() => setAbandonOpen(true)}
+              data-testid="abandon-flow"
+            >
+              Discard session
+            </Button>
+          )}
+        </div>
       </div>
       {flow.data.status === 'failed' && (
         <p className="af-page__hint">
