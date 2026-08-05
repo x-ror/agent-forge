@@ -1,4 +1,4 @@
-import { Content, Dropdown, Header, HeaderGlobalAction, HeaderGlobalBar, HeaderName, InlineLoading, SideNav, SideNavItems, SideNavLink, Theme } from '@carbon/react';
+import { Content, Dropdown, Header, HeaderGlobalAction, HeaderGlobalBar, HeaderMenuItem, HeaderName, HeaderNavigation, InlineLoading, Theme } from '@carbon/react';
 import { Asleep, Light, Logout } from '@carbon/icons-react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useEffect } from 'react';
@@ -95,6 +95,9 @@ export default function App() {
     { to: '/flow-runs', label: 'Flow Runs' },
     { to: '/settings', label: 'Settings' },
   ];
+  // Section highlighting: nested routes (/workflows/:id, /flow-runs/:id) keep
+  // their section lit; run detail pages belong to Flow Runs.
+  const isActive = (to: string) => (to === '/' ? location.pathname === '/' : location.pathname.startsWith(to) || (to === '/flow-runs' && location.pathname.startsWith('/runs/')));
 
   return (
     <Theme className="af-app" theme={theme}>
@@ -102,6 +105,13 @@ export default function App() {
         <HeaderName as={Link} to="/" prefix="">
           AgentForge
         </HeaderName>
+        <HeaderNavigation aria-label="Main navigation">
+          {nav.map((item) => (
+            <HeaderMenuItem key={item.to} as={Link} to={item.to} isActive={isActive(item.to)}>
+              {item.label}
+            </HeaderMenuItem>
+          ))}
+        </HeaderNavigation>
         <HeaderGlobalBar>
           <ProjectPicker />
           <HeaderGlobalAction aria-label="Toggle theme" onClick={toggleTheme}>
@@ -112,15 +122,6 @@ export default function App() {
           </HeaderGlobalAction>
         </HeaderGlobalBar>
       </Header>
-      <SideNav aria-label="Side navigation" expanded isPersistent isChildOfHeader>
-        <SideNavItems>
-          {nav.map((item) => (
-            <SideNavLink key={item.to} as={Link} to={item.to} isActive={location.pathname === item.to}>
-              {item.label}
-            </SideNavLink>
-          ))}
-        </SideNavItems>
-      </SideNav>
       <Content className="af-shell__content">
         <Routes>
           <Route path="/" element={<TaskBoardPage />} />

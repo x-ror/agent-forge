@@ -16,8 +16,11 @@
 }
 
 /* ---- shell ---- */
+/* No sidebar: nav lives in the header, content is centered full-width. */
 .af-shell__content {
-  margin-left: 16rem;
+  max-width: 104rem;
+  width: 100%;
+  margin: 0 auto;
   min-height: calc(100vh - 3rem); /* viewport minus the 48px header */
 }
 
